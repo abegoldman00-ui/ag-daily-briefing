@@ -481,10 +481,28 @@
     });
   }
 
-  function showApp() {
+  async function migrateLocalToSupabase(){
+    const migrated = localStorage.getItem('agbriefing:migrated');
+    if(migrated) return;
+    let local=[];
+    try { local = JSON.parse(localStorage.getItem(LSKEY) || '[]'); } catch(e){}
+    if(!local.length) return;
+    for(const it of local){
+      const row = {
+        kind: it.kind, text: it.text, body: it.body || null,
+        meta: it.meta || null, people: it.people || [], customer: it.customer || null,
+        priority: it.priority || 'normal', due: it.due || null, done: !!it.done
+      };
+      await supabase.from('items').insert(row);
+    }
+    localStorage.setItem('agbriefing:migrated','1');
+  }
+
+  async function showApp() {
     authScreen.style.display = 'none';
     appEl.style.display = 'block';
     document.getElementById('date-subtitle').textContent = dayjs().format('dddd, MMMM D, YYYY');
+    if(USE_SUPABASE) await migrateLocalToSupabase();
     load();
   }
   function showAuth() { authScreen.style.display = ''; appEl.style.display = 'none'; }
