@@ -352,6 +352,9 @@
   };
 
   const LSKEY = 'agbriefing:items:v3';
+  if (!localStorage.getItem(LSKEY) && localStorage.getItem('agbriefing:items:v2')) {
+    localStorage.setItem(LSKEY, localStorage.getItem('agbriefing:items:v2'));
+  }
   let items = [], filter = 'all', fPerson = '', fCustomer = '', searchQ = '';
   const $ = id => document.getElementById(id);
   const listEl=$('list'),statsEl=$('stats'),entryEl=$('entry'),kindEl=$('kind'),mtimeEl=$('mtime'),
