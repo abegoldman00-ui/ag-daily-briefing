@@ -950,10 +950,18 @@
 
   function buildBriefingHtml(){
     const today=dayjs().format('dddd, MMMM D, YYYY');
-    const sortByDate=(a,b)=>{
-      if(a.due&&b.due) return a.due<b.due?-1:a.due>b.due?1:0;
+    const sortByDatePriority=(a,b)=>{
+      if(a.due&&b.due){
+        if(a.due<b.due) return -1;
+        if(a.due>b.due) return 1;
+        if(a.priority==='high'&&b.priority!=='high') return -1;
+        if(b.priority==='high'&&a.priority!=='high') return 1;
+        return 0;
+      }
       if(a.due) return -1;
       if(b.due) return 1;
+      if(a.priority==='high'&&b.priority!=='high') return -1;
+      if(b.priority==='high'&&a.priority!=='high') return 1;
       return b.ts-a.ts;
     };
 
@@ -962,21 +970,31 @@
 
     const typeColors={todo:'#2563eb',reminder:'#c2410c',meeting:'#7c3aed',doc:'#666'};
     const typeLabels={todo:'To-do',reminder:'Reminder',meeting:'Meeting',doc:'Doc'};
+    const typeBg={todo:'#eff6ff',reminder:'#fff7ed',meeting:'#f5f3ff',doc:'#f5f5f5'};
 
     const checkbox=it=>`<span style="display:inline-block;width:13px;height:13px;border:1.5px solid ${it.done?'#16a34a':'#bbb'};border-radius:3px;${it.done?'background:#16a34a;':''}"></span>`;
 
     const row=it=>{
       const high=it.priority==='high';
       const od=isOverdueOrToday(it);
+      const ds=isDueSoon(it);
+      let dateLabel='';
+      if(it.due){
+        const d=dayjs(it.due),td=dayjs(todayISO()),diff=d.diff(td,'day');
+        if(diff<0) dateLabel=d.format('MMM D')+' ('+Math.abs(diff)+'d late)';
+        else if(diff===0) dateLabel='Today';
+        else if(diff===1) dateLabel='Tomorrow';
+        else dateLabel=d.format('ddd, MMM D');
+      }
       let r=`<tr style="border-bottom:1px solid #f0f0f0;${high?'background:#fffbeb;':''}">`;
       r+=`<td style="padding:8px 10px;vertical-align:top;">${checkbox(it)}</td>`;
-      r+=`<td style="padding:8px 10px;${it.done?'text-decoration:line-through;color:#aaa;':''}">`
+      r+=`<td style="padding:8px 10px;${it.done?'text-decoration:line-through;color:#aaa;':''}">`;
       r+=`<div style="font-weight:${high?'600':'500'};font-size:13px;color:${it.done?'#aaa':'#1a1a2e'};">${high?'<span style="color:#c2410c;">&#9873;</span> ':''}${esc(it.text)}</div>`;
       if(it.meta) r+=`<div style="font-size:11px;color:#7c3aed;margin-top:2px;">${esc(it.meta)}</div>`;
       if(it.body) r+=`<div style="font-size:11px;color:#888;margin-top:3px;line-height:1.4;">${esc(it.body.slice(0,120))}${it.body.length>120?'...':''}</div>`;
       r+=`</td>`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;"><span style="font-size:10px;font-weight:600;color:${typeColors[it.kind]};background:${it.kind==='todo'?'#eff6ff':it.kind==='reminder'?'#fff7ed':it.kind==='meeting'?'#f5f3ff':'#f5f5f5'};padding:2px 8px;border-radius:10px;">${typeLabels[it.kind]}</span></td>`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;font-size:12px;color:${od?'#c2410c':'#555'};${od?'font-weight:600;':''}">${it.due?dayjs(it.due).format('MMM D'):''}</td>`;
+      r+=`<td style="padding:8px 10px;vertical-align:top;"><span style="font-size:10px;font-weight:600;color:${typeColors[it.kind]};background:${typeBg[it.kind]};padding:2px 8px;border-radius:10px;">${typeLabels[it.kind]}</span></td>`;
+      r+=`<td style="padding:8px 10px;vertical-align:top;font-size:12px;color:${od?'#c2410c':ds?'#b45309':'#555'};${(od||ds)?'font-weight:600;':''}">${dateLabel}</td>`;
       r+=`<td style="padding:8px 10px;vertical-align:top;">${high?'<span style="font-size:10px;font-weight:600;color:#c2410c;background:#fff7ed;padding:2px 8px;border-radius:10px;">High</span>':'<span style="font-size:10px;color:#999;">Normal</span>'}</td>`;
       r+=`<td style="padding:8px 10px;vertical-align:top;">${it.customer?'<span style="font-size:10px;font-weight:500;color:#15803d;background:#f0fdf4;padding:2px 8px;border-radius:10px;">'+esc(it.customer)+'</span>':''}</td>`;
       r+=`<td style="padding:8px 10px;vertical-align:top;font-size:11px;color:#777;">${(it.people||[]).map(p=>esc(p)).join(', ')}</td>`;
@@ -986,7 +1004,7 @@
 
     const sec=(title,icon,color,arr)=>{
       if(!arr.length) return '';
-      arr.sort(sortByDate);
+      arr.sort(sortByDatePriority);
       return `<div style="margin-top:28px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${color};">
           <span style="font-size:16px;">${icon}</span>
@@ -1002,7 +1020,7 @@
     const todoItems=items.filter(x=>!x.done&&x.kind==='todo'&&!isOverdueOrToday(x));
     const reminderItems=items.filter(x=>!x.done&&x.kind==='reminder'&&!isOverdueOrToday(x));
     const docItems=items.filter(x=>x.kind==='doc');
-    const doneToday=items.filter(x=>x.done);
+    const doneItems=items.filter(x=>x.done);
 
     const openCount=items.filter(x=>!x.done&&x.kind!=='doc').length;
     const overdueCount=overdueItems.length;
@@ -1033,7 +1051,7 @@
     body+=sec('To-dos','&#9744;','#2563eb',todoItems);
     body+=sec('Reminders','&#128276;','#d97706',reminderItems);
     body+=sec('Docs / Notes','&#128196;','#64748b',docItems);
-    if(doneToday.length) body+=sec('Completed','&#9989;','#15803d',doneToday);
+    if(doneItems.length) body+=sec('Completed','&#9989;','#15803d',doneItems);
 
     body+=`<div style="margin-top:36px;padding-top:14px;border-top:2px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
       <span style="font-size:11px;color:#aaa;">AG Daily Briefing</span>
@@ -1043,49 +1061,40 @@
     return {today, body};
   }
 
-  function printBriefing(){
+  function briefingFullHtml(){
     const {today, body} = buildBriefingHtml();
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AG Daily Briefing — ${today}</title><style>body{font-family:'Inter',system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact;}table{font-size:13px;}@media print{body{margin:20px auto;}.no-print{display:none!important;}}</style></head><body>${body}</body></html>`;
+  }
+
+  function printBriefing(){
     let w=window.open('','_blank');
-    w.document.write(`<html><head><title>AG Daily Briefing — ${today}</title><style>body{font-family:'Inter',system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact;}table{font-size:13px;}@media print{body{margin:20px auto;}}</style></head><body>${body}</body></html>`);
+    w.document.write(briefingFullHtml());
     w.document.close(); w.print();
   }
 
-  function emailBriefing(){
-    const today=dayjs().format('dddd, MMMM D, YYYY');
-    const sortByDate=(a,b)=>{
-      if(a.due&&b.due) return a.due<b.due?-1:a.due>b.due?1:0;
-      if(a.due) return -1;
-      if(b.due) return 1;
-      return b.ts-a.ts;
-    };
-    const typeLabels={todo:'TO-DO',reminder:'REMINDER',meeting:'MEETING',doc:'DOC'};
-    const fmtItems=(arr)=>{
-      arr.sort(sortByDate);
-      return arr.map(it=>{
-        let line = (it.priority==='high'?'[HIGH] ':'')+it.text;
-        if(it.due) line += ' (due '+dayjs(it.due).format('MMM D')+')';
-        if(it.kind) line = '['+typeLabels[it.kind]+'] '+line;
-        if(it.customer) line += ' — '+it.customer;
-        if(it.people&&it.people.length) line += ' | '+it.people.join(', ');
-        if(it.meta) line += '\n    '+it.meta;
-        if(it.body) line += '\n    '+it.body.slice(0,100)+(it.body.length>100?'...':'');
-        return '  - '+line;
-      }).join('\n');
-    };
-    let text = 'AG DAILY BRIEFING\n'+today+'\n'+('='.repeat(40))+'\n';
-    const overdueItems=items.filter(isOverdueOrToday);
-    const meetingItems=items.filter(x=>x.kind==='meeting'&&!x.done&&!isOverdueOrToday(x));
-    const todoItems=items.filter(x=>!x.done&&x.kind==='todo'&&!isOverdueOrToday(x));
-    const reminderItems=items.filter(x=>!x.done&&x.kind==='reminder'&&!isOverdueOrToday(x));
-    const docItems=items.filter(x=>x.kind==='doc');
-    if(overdueItems.length) text+='\nOVERDUE / DUE TODAY ('+overdueItems.length+')\n'+fmtItems(overdueItems)+'\n';
-    if(meetingItems.length) text+='\nMEETINGS ('+meetingItems.length+')\n'+fmtItems(meetingItems)+'\n';
-    if(todoItems.length) text+='\nTO-DOS ('+todoItems.length+')\n'+fmtItems(todoItems)+'\n';
-    if(reminderItems.length) text+='\nREMINDERS ('+reminderItems.length+')\n'+fmtItems(reminderItems)+'\n';
-    if(docItems.length) text+='\nDOCS / NOTES ('+docItems.length+')\n'+fmtItems(docItems)+'\n';
-    text+='\n'+('='.repeat(40))+'\nGenerated '+dayjs().format('MMM D, YYYY [at] h:mm A');
-    const subject = 'AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
-    window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
+  async function emailBriefing(){
+    const subject='AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
+    const html=briefingFullHtml();
+    const file=new File([html],subject.replace(/[^a-zA-Z0-9 —-]/g,'')+'.html',{type:'text/html'});
+
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try {
+        await navigator.share({title:subject,files:[file]});
+        return;
+      } catch(e){ if(e.name==='AbortError') return; }
+    }
+
+    const blob=new Blob([html],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=subject.replace(/[^a-zA-Z0-9 —-]/g,'')+'.html';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setTimeout(()=>{
+      window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent('Your AG Daily Briefing is attached. Open the downloaded .html file and print to PDF, or attach it to this email.');
+    },500);
   }
 
   function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
