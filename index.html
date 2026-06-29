@@ -602,6 +602,9 @@
   </div>
 </div>
 
+<div id="day-preview" style="display:none; position:fixed; inset:0; z-index:999; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center;">
+  <div id="day-preview-inner" style="background:var(--surface-1); border-radius:12px; padding:20px; max-width:420px; width:90%; max-height:70vh; overflow-y:auto; box-shadow:0 12px 40px rgba(0,0,0,.25); position:relative;"></div>
+</div>
 <div id="edit-modal" class="edit-overlay" style="display:none;"></div>
 <div id="undo-container"></div>
 
@@ -1360,10 +1363,39 @@
     calendarView.querySelectorAll('[data-cal-date]').forEach(el=>{
       el.onclick=()=>{
         const d=el.getAttribute('data-cal-date');
-        dueEl.value=d;
-        currentView='list';
-        switchView();
-        entryEl.focus();
+        const dayItems=itemsByDate[d]||[];
+        const label=dayjs(d).format('dddd, MMMM D, YYYY');
+        const typeIcons={todo:'☐',reminder:'🔔',meeting:'📅',doc:'📄'};
+        const typeColors={todo:'#2563eb',reminder:'#c2410c',meeting:'#7c3aed',doc:'#888'};
+        let h=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;font-size:16px;color:var(--text-primary);">${label}</h3>
+          <button id="day-preview-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);padding:0 4px;">✕</button>
+        </div>`;
+        if(!dayItems.length){
+          h+=`<p style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0;">No items scheduled</p>`;
+        } else {
+          dayItems.forEach(it=>{
+            const color=typeColors[it.kind]||'#888';
+            const icon=typeIcons[it.kind]||'';
+            h+=`<div class="day-preview-item" data-edit="${it.id}" style="padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--surface-2);cursor:pointer;border-left:3px solid ${color};">
+              <div style="font-size:14px;font-weight:500;color:var(--text-primary);">${icon} ${it.priority==='high'?'<span style="color:#dc2626;">⚑</span> ':''}${esc(it.text)}</div>
+              ${it.people&&it.people.length?`<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">👤 ${it.people.join(', ')}</div>`:''}
+              ${it.customer?`<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">🏢 ${it.customer}</div>`:''}
+              ${it.meta?`<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">📍 ${it.meta}</div>`:''}
+              ${it.body?`<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;white-space:pre-wrap;">${esc(it.body).substring(0,120)}${it.body.length>120?'…':''}</div>`:''}
+            </div>`;
+          });
+        }
+        h+=`<button id="day-preview-add" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;background:var(--surface-2);border:1px dashed var(--border);color:var(--text-muted);cursor:pointer;font-size:13px;">+ Add item on this day</button>`;
+        const overlay=$('day-preview');
+        $('day-preview-inner').innerHTML=h;
+        overlay.style.display='flex';
+        $('day-preview-close').onclick=()=>{overlay.style.display='none';};
+        overlay.onclick=(e)=>{if(e.target===overlay)overlay.style.display='none';};
+        $('day-preview-inner').querySelectorAll('[data-edit]').forEach(el2=>{
+          el2.onclick=(e)=>{e.stopPropagation();overlay.style.display='none';openEdit(el2.getAttribute('data-edit'));};
+        });
+        $('day-preview-add').onclick=()=>{overlay.style.display='none';dueEl.value=d;$('add-panel').style.display='';$('toggle-add').textContent='✕ Close';entryEl.focus();};
       };
     });
   }
