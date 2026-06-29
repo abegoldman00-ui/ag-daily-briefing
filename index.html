@@ -19,10 +19,12 @@
       --text-warning: #c2410c;
       --text-success: #15803d;
       --text-pro: #7c3aed;
+      --text-due-soon: #b45309;
       --bg-accent: #eff6ff;
       --bg-warning: #fff7ed;
       --bg-success: #f0fdf4;
       --bg-pro: #f5f3ff;
+      --bg-due-soon: #fffbeb;
       --border: #e2e4ea;
       --border-strong: #c5c8d0;
       --border-warning: #fb923c;
@@ -44,10 +46,12 @@
         --text-warning: #fb923c;
         --text-success: #4ade80;
         --text-pro: #a78bfa;
+        --text-due-soon: #fbbf24;
         --bg-accent: #172554;
         --bg-warning: #431407;
         --bg-success: #052e16;
         --bg-pro: #2e1065;
+        --bg-due-soon: #422006;
         --border: #2a2a40;
         --border-strong: #3a3a55;
         --border-warning: #c2410c;
@@ -96,11 +100,7 @@
     #auth-screen h2 { margin: 0 0 0.5rem; font-size: 22px; font-weight: 600; }
     #auth-screen p { margin: 0 0 1.5rem; font-size: 13px; color: var(--text-muted); }
     #auth-screen input { width: 100%; margin-bottom: 10px; }
-    #auth-screen button {
-      width: 100%;
-      padding: 9px;
-      font-weight: 500;
-    }
+    #auth-screen button { width: 100%; padding: 9px; font-weight: 500; }
     #auth-error { color: var(--text-warning); font-size: 13px; margin-top: 8px; }
 
     #app { display: none; }
@@ -122,13 +122,19 @@
       border-radius: var(--radius);
       margin-bottom: 8px;
       box-shadow: var(--shadow-sm);
-      transition: box-shadow 0.15s;
+      transition: box-shadow 0.15s, transform 0.15s;
     }
     .item-row:hover { box-shadow: var(--shadow-md); }
     .item-row.high-priority {
       border-left: 3px solid var(--border-warning);
       border-radius: 0 var(--radius) var(--radius) 0;
     }
+    .item-row.due-soon {
+      border-left: 3px solid var(--text-due-soon);
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .item-row.dragging { opacity: 0.5; transform: scale(0.98); }
+    .item-row.drag-over { border-top: 2px solid var(--text-accent); }
 
     .tag {
       font-size: 11px;
@@ -164,6 +170,13 @@
       padding: 7px 18px;
     }
     .btn-primary:hover { opacity: 0.9; }
+    .btn-danger {
+      background: var(--text-warning);
+      color: white;
+      border-color: var(--text-warning);
+      font-weight: 500;
+      padding: 7px 18px;
+    }
 
     .btn-ghost {
       border: none;
@@ -196,12 +209,82 @@
     .edit-panel input, .edit-panel select, .edit-panel textarea { width: 100%; margin-bottom: 2px; }
     .edit-panel .edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
+    .confirm-panel {
+      background: var(--surface-1);
+      border-radius: 14px;
+      padding: 1.5rem;
+      width: 90%;
+      max-width: 360px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+    .confirm-panel h3 { margin: 0 0 0.5rem; font-size: 16px; font-weight: 600; }
+    .confirm-panel p { margin: 0 0 1.25rem; font-size: 13px; color: var(--text-secondary); }
+    .confirm-panel .edit-actions { display: flex; gap: 8px; justify-content: center; }
+
     .section-title {
       font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 10px;
+    }
+
+    .completed-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 10px 0;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: none;
+      background: none;
+      width: 100%;
+    }
+    .completed-toggle:hover { color: var(--text-secondary); }
+    .completed-toggle .arrow { transition: transform 0.2s; display: inline-block; }
+    .completed-toggle .arrow.open { transform: rotate(90deg); }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--text-muted);
+      font-size: 14px;
+      padding: 0 4px;
+      user-select: none;
+      flex: 0 0 auto;
+    }
+    .drag-handle:active { cursor: grabbing; }
+
+    .undo-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--text-primary);
+      color: var(--surface-0);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .undo-toast button {
+      background: none;
+      border: none;
+      color: var(--text-accent);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 0;
+      cursor: pointer;
     }
 
     @media (max-width: 600px) {
@@ -212,7 +295,7 @@
       #auth-screen, #app > div:first-child button, .fbtn, #clearlinks,
       #search, #fperson, #fcustomer, #typefilters, .add-section,
       button[data-del], button[data-toggle], button[data-expand], button[data-edit],
-      .edit-overlay { display: none !important; }
+      .edit-overlay, .drag-handle, .completed-toggle, .undo-toast { display: none !important; }
       body { background: white; color: black; }
       .item-row { box-shadow: none; border: 1px solid #ddd; }
     }
@@ -290,10 +373,12 @@
 
     <div id="stats" class="stat-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.5rem;"></div>
     <div id="list"></div>
+    <div id="completed-section"></div>
   </div>
 </div>
 
 <div id="edit-modal" class="edit-overlay" style="display:none;"></div>
+<div id="undo-container"></div>
 
 <script>
 (function(){
@@ -356,11 +441,16 @@
     localStorage.setItem(LSKEY, localStorage.getItem('agbriefing:items:v2'));
   }
   let items = [], filter = 'all', fPerson = '', fCustomer = '', searchQ = '';
+  let showCompleted = false;
+  let undoTimer = null, undoItem = null;
+  let dragId = null;
+
   const $ = id => document.getElementById(id);
   const listEl=$('list'),statsEl=$('stats'),entryEl=$('entry'),kindEl=$('kind'),mtimeEl=$('mtime'),
     docbodyEl=$('docbody'),peopleEl=$('people'),customerEl=$('customer'),dueEl=$('due'),prioEl=$('priority'),
     fPersonEl=$('fperson'),fCustomerEl=$('fcustomer'),clearLinksEl=$('clearlinks'),searchEl=$('search'),
-    custlist=$('custlist'),editModal=$('edit-modal');
+    custlist=$('custlist'),editModal=$('edit-modal'),completedSection=$('completed-section'),
+    undoContainer=$('undo-container');
 
   const kindMeta={
     todo:{label:'To-do',color:'var(--text-accent)',bg:'var(--bg-accent)'},
@@ -373,6 +463,11 @@
   function dayLabel(d){ return dayjs(d).format('dddd, MMM D'); }
   function parsePeople(s){ return (s||'').split(',').map(x=>x.trim()).filter(Boolean); }
   function isOverdueOrToday(it){ return it.due && !it.done && (it.kind==='todo'||it.kind==='reminder') && dayjs(it.due).isBefore(dayjs(todayISO()).add(1,'day')); }
+  function isDueSoon(it){
+    if(!it.due || it.done || it.kind==='doc') return false;
+    const d=dayjs(it.due), today=dayjs(todayISO());
+    return d.isAfter(today) && d.isBefore(today.add(3,'day'));
+  }
 
   function syncFields(){
     const k=kindEl.value;
@@ -392,11 +487,13 @@
           id: row.id, text: row.text, kind: row.kind, done: row.done,
           ts: new Date(row.created_at).getTime(), people: row.people || [],
           customer: row.customer || '', priority: row.priority,
-          due: row.due || '', meta: row.meta || '', body: row.body || ''
+          due: row.due || '', meta: row.meta || '', body: row.body || '',
+          sortOrder: row.sort_order || 0
         }));
       }
     } else {
       try { items = JSON.parse(localStorage.getItem(LSKEY) || '[]'); } catch(e) { items = []; }
+      items.forEach((it,i) => { if(!it.sortOrder) it.sortOrder = i; });
     }
     rebuildLinks(); render();
   }
@@ -434,25 +531,67 @@
     const text=entryEl.value.trim(),k=kindEl.value;
     if(!text) return;
     const id = USE_SUPABASE ? crypto.randomUUID() : 'i'+Date.now();
+    const maxOrder = items.reduce((m,it) => Math.max(m, it.sortOrder||0), 0);
     const it={id,text,kind:k,done:false,ts:Date.now(),
       people:parsePeople(peopleEl.value),customer:customerEl.value.trim(),
       priority:prioEl.value,
       due:(k==='todo'||k==='reminder'||k==='meeting')?dueEl.value:'',
       meta:k==='meeting'?mtimeEl.value.trim():'',
-      body:docbodyEl.value.trim()};
+      body:docbodyEl.value.trim(),
+      sortOrder:maxOrder+1};
     items.push(it);
     entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';prioEl.value='normal';
     saveItem(it); rebuildLinks(); render();
   }
+
   function toggle(id){const it=items.find(x=>x.id===id);if(it){it.done=!it.done;saveItem(it);render();}}
-  function del(id){items=items.filter(x=>x.id!==id);deleteItem(id);rebuildLinks();render();}
+
+  function confirmDel(id){
+    const it=items.find(x=>x.id===id);
+    if(!it) return;
+    editModal.innerHTML=`<div class="confirm-panel">
+      <h3>Delete item?</h3>
+      <p>"${esc(it.text)}" will be permanently removed.</p>
+      <div class="edit-actions">
+        <button id="del-cancel" style="padding:7px 16px;">Cancel</button>
+        <button id="del-confirm" class="btn-danger">Delete</button>
+      </div>
+    </div>`;
+    editModal.style.display='flex';
+    document.getElementById('del-cancel').onclick=()=>{editModal.style.display='none';};
+    editModal.onclick=(e)=>{if(e.target===editModal)editModal.style.display='none';};
+    document.getElementById('del-confirm').onclick=()=>{
+      editModal.style.display='none';
+      undoItem = Object.assign({}, it);
+      items=items.filter(x=>x.id!==id);
+      deleteItem(id);
+      rebuildLinks(); render();
+      showUndo(it.text);
+    };
+  }
+
+  function showUndo(text){
+    if(undoTimer) clearTimeout(undoTimer);
+    const short = text.length > 30 ? text.slice(0,30)+'…' : text;
+    undoContainer.innerHTML=`<div class="undo-toast">"${esc(short)}" deleted <button id="undo-btn">Undo</button></div>`;
+    document.getElementById('undo-btn').onclick=()=>{
+      if(undoItem){
+        items.push(undoItem);
+        saveItem(undoItem);
+        undoItem=null;
+        rebuildLinks(); render();
+      }
+      undoContainer.innerHTML='';
+      if(undoTimer) clearTimeout(undoTimer);
+    };
+    undoTimer = setTimeout(()=>{ undoContainer.innerHTML=''; undoItem=null; }, 6000);
+  }
+
   function expand(id){const it=items.find(x=>x.id===id);if(it){it._open=!it._open;render();}}
 
   function openEdit(id){
     const it=items.find(x=>x.id===id);
     if(!it) return;
-    const showDue = it.kind==='todo'||it.kind==='reminder'||it.kind==='meeting';
-    const showMeta = it.kind==='meeting';
     editModal.innerHTML=`<div class="edit-panel">
       <h3>Edit item</h3>
       <label>Title</label>
@@ -520,8 +659,8 @@
 
   function render(){
     const today=todayISO();
-    let shown=items.slice();
-    if(filter==='open') shown=shown.filter(x=>!x.done&&x.kind!=='doc');
+    let shown=items.filter(x=>!x.done);
+    if(filter==='open') shown=shown.filter(x=>x.kind!=='doc');
     else if(filter==='today') shown=shown.filter(x=>dayjs(x.ts).format('YYYY-MM-DD')===today);
     else if(filter==='meeting') shown=shown.filter(x=>x.kind==='meeting');
     else if(filter==='doc') shown=shown.filter(x=>x.kind==='doc');
@@ -546,27 +685,50 @@
     if(shown.length===0){
       const note=(fPerson||fCustomer||searchQ)?'No items match this filter.':'Nothing here yet. Add your first item above.';
       listEl.innerHTML=`<div style="text-align:center; padding:3rem 1rem; color:var(--text-muted);"><p style="margin:0; font-size:14px;">${note}</p></div>`;
-      return;
+    } else {
+      let html='';
+      const pinned=shown.filter(isOverdueOrToday).sort((a,b)=>(a.due<b.due?-1:1));
+      if(pinned.length && filter!=='doc' && filter!=='meeting'){
+        html+=`<div style="margin-bottom:1.5rem;"><div class="section-title" style="color:var(--text-warning);">Overdue / due today</div>`;
+        pinned.forEach(it=>html+=rowHtml(it));
+        html+=`</div>`;
+      }
+      const pinnedIds=new Set(pinned.map(x=>x.id));
+      const rest=shown.filter(x=>!pinnedIds.has(x.id));
+      const groups={};
+      rest.sort((a,b)=>{
+        const ao=a.sortOrder||0, bo=b.sortOrder||0;
+        if(ao!==bo) return bo-ao;
+        return b.ts-a.ts;
+      }).forEach(it=>{const k=dayLabel(it.ts);(groups[k]=groups[k]||[]).push(it);});
+      Object.keys(groups).forEach(day=>{
+        const isToday=day===dayLabel(Date.now());
+        html+=`<div style="margin-bottom:1.5rem;"><div class="section-title" style="color:${isToday?'var(--text-accent)':'var(--text-muted)'};">${day}${isToday?' · today':''}</div>`;
+        groups[day].forEach(it=>html+=rowHtml(it));
+        html+=`</div>`;
+      });
+      listEl.innerHTML=html;
     }
 
-    let html='';
-    const pinned=shown.filter(isOverdueOrToday).sort((a,b)=>(a.due<b.due?-1:1));
-    if(pinned.length && filter!=='doc' && filter!=='meeting'){
-      html+=`<div style="margin-bottom:1.5rem;"><div class="section-title" style="color:var(--text-warning);">Overdue / due today</div>`;
-      pinned.forEach(it=>html+=rowHtml(it));
-      html+=`</div>`;
+    // Completed section
+    let doneItems = items.filter(x=>x.done);
+    if(fPerson) doneItems=doneItems.filter(x=>(x.people||[]).includes(fPerson));
+    if(fCustomer) doneItems=doneItems.filter(x=>x.customer===fCustomer);
+    doneItems=doneItems.filter(matchSearch);
+
+    if(doneItems.length > 0){
+      let chtml=`<button class="completed-toggle" id="toggle-completed"><span class="arrow${showCompleted?' open':''}">▶</span> Completed (${doneItems.length})</button>`;
+      if(showCompleted){
+        chtml+=`<div style="margin-bottom:1.5rem;">`;
+        doneItems.sort((a,b)=>b.ts-a.ts).forEach(it=>chtml+=rowHtml(it));
+        chtml+=`</div>`;
+      }
+      completedSection.innerHTML=chtml;
+      document.getElementById('toggle-completed').onclick=()=>{showCompleted=!showCompleted;render();};
+    } else {
+      completedSection.innerHTML='';
     }
-    const pinnedIds=new Set(pinned.map(x=>x.id));
-    const rest=shown.filter(x=>!pinnedIds.has(x.id));
-    const groups={};
-    rest.sort((a,b)=>b.ts-a.ts).forEach(it=>{const k=dayLabel(it.ts);(groups[k]=groups[k]||[]).push(it);});
-    Object.keys(groups).forEach(day=>{
-      const isToday=day===dayLabel(Date.now());
-      html+=`<div style="margin-bottom:1.5rem;"><div class="section-title" style="color:${isToday?'var(--text-accent)':'var(--text-muted)'};">${day}${isToday?' · today':''}</div>`;
-      groups[day].forEach(it=>html+=rowHtml(it));
-      html+=`</div>`;
-    });
-    listEl.innerHTML=html;
+
     bind();
   }
 
@@ -574,15 +736,27 @@
     const m=kindMeta[it.kind];
     const canCheck=(it.kind==='todo'||it.kind==='reminder'||it.kind==='meeting');
     const high=it.priority==='high'&&!it.done;
-    let h=`<div class="item-row${high?' high-priority':''}">`;
-    h+=`<div style="display:flex; align-items:flex-start; gap:10px;">`;
+    const dueSoon=isDueSoon(it)&&!high;
+    let cls='item-row';
+    if(high) cls+=' high-priority';
+    else if(dueSoon) cls+=' due-soon';
+    let h=`<div class="${cls}" draggable="true" data-drag-id="${it.id}">`;
+    h+=`<div style="display:flex; align-items:flex-start; gap:8px;">`;
+    if(!it.done) h+=`<span class="drag-handle" title="Drag to reorder">⠿</span>`;
     if(canCheck) h+=`<button data-toggle="${it.id}" style="flex:0 0 auto; width:20px; height:20px; padding:0; border-radius:50%; border:2px solid ${it.done?'var(--text-success)':'var(--border-strong)'}; ${it.done?'background:var(--text-success); color:white;':'background:none;'} font-size:12px; line-height:16px; text-align:center;">${it.done?'✓':''}</button>`;
     else h+=`<span style="flex:0 0 auto; width:20px; text-align:center; color:var(--text-muted);">·</span>`;
     h+=`<div style="flex:1; min-width:0;"><div style="font-size:14px; font-weight:500; color:var(--text-primary); ${it.done?'text-decoration:line-through; color:var(--text-muted); font-weight:400;':''}">${high?'⚑ ':''}${esc(it.text)}</div>`;
     h+=`<div style="display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap;">`;
     h+=`<span class="tag" style="background:${m.bg}; color:${m.color};">${m.label}</span>`;
     if(it.meta) h+=`<span style="font-size:11px; color:var(--text-pro);">${esc(it.meta)}</span>`;
-    if(it.due){ const od=isOverdueOrToday(it); h+=`<span style="font-size:11px; color:${od?'var(--text-warning)':'var(--text-muted)'};">${it.kind==='meeting'?'':'due '}${dayjs(it.due).format('MMM D')}</span>`; }
+    if(it.due){
+      const od=isOverdueOrToday(it);
+      const ds=isDueSoon(it);
+      let dueColor=od?'var(--text-warning)':ds?'var(--text-due-soon)':'var(--text-muted)';
+      let dueLabel=it.kind==='meeting'?'':'due ';
+      if(ds&&!od) dueLabel='due soon · ';
+      h+=`<span style="font-size:11px; color:${dueColor}; ${ds&&!od?'font-weight:500;':''}">${dueLabel}${dayjs(it.due).format('MMM D')}</span>`;
+    }
     if(it.customer) h+=`<span data-fc="${esc(it.customer)}" class="tag" style="background:var(--bg-success); color:var(--text-success); cursor:pointer;">${esc(it.customer)}</span>`;
     (it.people||[]).forEach(p=>h+=`<span data-fp="${esc(p)}" class="tag" style="background:var(--surface-2); color:var(--text-secondary); cursor:pointer;">${esc(p)}</span>`);
     if(it.body) h+=`<button data-expand="${it.id}" class="btn-ghost" style="font-size:11px; padding:1px 6px; color:var(--text-accent);">${it._open?'Hide notes':'Notes'}</button>`;
@@ -596,12 +770,53 @@
   }
 
   function bind(){
-    listEl.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggle(b.getAttribute('data-toggle')));
-    listEl.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>del(b.getAttribute('data-del')));
-    listEl.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>expand(b.getAttribute('data-expand')));
-    listEl.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(b.getAttribute('data-edit')));
-    listEl.querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>{fPerson=b.getAttribute('data-fp');fCustomer='';rebuildLinks();render();});
-    listEl.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{fCustomer=b.getAttribute('data-fc');fPerson='';rebuildLinks();render();});
+    document.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggle(b.getAttribute('data-toggle')));
+    document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDel(b.getAttribute('data-del')));
+    document.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>expand(b.getAttribute('data-expand')));
+    document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(b.getAttribute('data-edit')));
+    document.querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>{fPerson=b.getAttribute('data-fp');fCustomer='';rebuildLinks();render();});
+    document.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{fCustomer=b.getAttribute('data-fc');fPerson='';rebuildLinks();render();});
+
+    // Drag and drop
+    document.querySelectorAll('[data-drag-id]').forEach(el=>{
+      el.addEventListener('dragstart',(e)=>{
+        dragId=el.getAttribute('data-drag-id');
+        el.classList.add('dragging');
+        e.dataTransfer.effectAllowed='move';
+      });
+      el.addEventListener('dragend',()=>{
+        el.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+        dragId=null;
+      });
+      el.addEventListener('dragover',(e)=>{
+        e.preventDefault();
+        e.dataTransfer.dropEffect='move';
+        if(el.getAttribute('data-drag-id')!==dragId){
+          document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+          el.classList.add('drag-over');
+        }
+      });
+      el.addEventListener('dragleave',()=>{el.classList.remove('drag-over');});
+      el.addEventListener('drop',(e)=>{
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        const targetId=el.getAttribute('data-drag-id');
+        if(dragId && dragId!==targetId){
+          const dragItem=items.find(x=>x.id===dragId);
+          const targetItem=items.find(x=>x.id===targetId);
+          if(dragItem && targetItem){
+            const temp=dragItem.sortOrder;
+            dragItem.sortOrder=targetItem.sortOrder;
+            targetItem.sortOrder=temp;
+            saveItem(dragItem);
+            saveItem(targetItem);
+            save();
+            render();
+          }
+        }
+      });
+    });
   }
 
   function printBriefing(){
