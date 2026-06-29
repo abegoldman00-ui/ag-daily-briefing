@@ -38,8 +38,34 @@
       --shadow-md: 0 4px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04);
       --shadow-lg: 0 8px 24px rgba(0,0,0,0.1);
     }
+    [data-theme="dark"] {
+        --surface-0: #0f0f17;
+        --surface-1: #1a1a27;
+        --surface-2: #24243a;
+        --text-primary: #e8e8f0;
+        --text-secondary: #a0a0b8;
+        --text-muted: #6a6a80;
+        --text-accent: #60a5fa;
+        --text-warning: #fb923c;
+        --text-success: #4ade80;
+        --text-pro: #a78bfa;
+        --text-due-soon: #fbbf24;
+        --bg-accent: #172554;
+        --bg-warning: #431407;
+        --bg-success: #052e16;
+        --bg-pro: #2e1065;
+        --bg-due-soon: #422006;
+        --border: #2a2a40;
+        --border-strong: #3a3a55;
+        --border-warning: #c2410c;
+        --border-success: #15803d;
+        --border-accent: #2563eb;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+        --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+        --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+    }
     @media (prefers-color-scheme: dark) {
-      :root {
+      :root:not([data-theme="light"]) {
         --surface-0: #0f0f17;
         --surface-1: #1a1a27;
         --surface-2: #24243a;
@@ -507,6 +533,7 @@
         <p id="date-subtitle" style="margin:3px 0 0; font-size:13px; color:var(--text-muted);"></p>
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
+        <button id="btn-theme" style="font-size:14px; padding:4px 8px; border-radius:20px; border:1px solid var(--border); background:var(--surface-1);" title="Toggle dark/light mode">☀</button>
         <button id="btn-email" style="font-size:12px; padding:6px 16px; border-radius:20px;">Email briefing</button>
         <button id="btn-print" style="font-size:12px; padding:6px 16px; border-radius:20px;">Print</button>
         <button id="btn-logout" class="btn-ghost" style="font-size:12px;">Sign out</button>
@@ -1123,90 +1150,45 @@
     });
   }
 
-  function buildBriefingHtml(){
-    const today=dayjs().format('dddd, MMMM D, YYYY');
-    const sortByDatePriority=(a,b)=>{
-      if(a.due&&b.due){
-        if(a.due<b.due) return -1;
-        if(a.due>b.due) return 1;
-        if(a.priority==='high'&&b.priority!=='high') return -1;
-        if(b.priority==='high'&&a.priority!=='high') return 1;
-        return 0;
-      }
+  function briefingDateGroups(){
+    const typeLabels={todo:'To-do',reminder:'Reminder',meeting:'Meeting',doc:'Doc'};
+    const allOpen=items.filter(x=>!x.done).sort((a,b)=>{
+      if(a.due&&b.due) return a.due<b.due?-1:a.due>b.due?1:0;
       if(a.due) return -1;
       if(b.due) return 1;
-      if(a.priority==='high'&&b.priority!=='high') return -1;
-      if(b.priority==='high'&&a.priority!=='high') return 1;
       return b.ts-a.ts;
-    };
-
-    const thStyle='padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#8892a4;border-bottom:2px solid #e5e7eb;';
-    const thead=`<thead><tr><th style="${thStyle}width:28px;"></th><th style="${thStyle}">Item</th><th style="${thStyle}width:70px;">Type</th><th style="${thStyle}width:90px;">Due</th><th style="${thStyle}width:80px;">Priority</th><th style="${thStyle}width:110px;">Customer</th><th style="${thStyle}width:110px;">People</th></tr></thead>`;
-
-    const typeColors={todo:'#2563eb',reminder:'#c2410c',meeting:'#7c3aed',doc:'#666'};
-    const typeLabels={todo:'To-do',reminder:'Reminder',meeting:'Meeting',doc:'Doc'};
-    const typeBg={todo:'#eff6ff',reminder:'#fff7ed',meeting:'#f5f3ff',doc:'#f5f5f5'};
-
-    const checkbox=it=>`<span style="display:inline-block;width:13px;height:13px;border:1.5px solid ${it.done?'#16a34a':'#bbb'};border-radius:3px;${it.done?'background:#16a34a;':''}"></span>`;
-
-    const row=it=>{
-      const high=it.priority==='high';
-      const od=isOverdueOrToday(it);
-      const ds=isDueSoon(it);
-      let dateLabel='';
+    });
+    const groups={};
+    allOpen.forEach(it=>{
+      let label='No date';
       if(it.due){
         const d=dayjs(it.due),td=dayjs(todayISO()),diff=d.diff(td,'day');
-        if(diff<0) dateLabel=d.format('MMM D')+' ('+Math.abs(diff)+'d late)';
-        else if(diff===0) dateLabel='Today';
-        else if(diff===1) dateLabel='Tomorrow';
-        else dateLabel=d.format('ddd, MMM D');
+        if(diff<0) label='Overdue';
+        else if(diff===0) label='Today — '+d.format('ddd, MMM D');
+        else if(diff===1) label='Tomorrow — '+d.format('ddd, MMM D');
+        else label=d.format('dddd, MMM D');
       }
-      let r=`<tr style="border-bottom:1px solid #f0f0f0;${high?'background:#fffbeb;':''}">`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;">${checkbox(it)}</td>`;
-      r+=`<td style="padding:8px 10px;${it.done?'text-decoration:line-through;color:#aaa;':''}">`;
-      r+=`<div style="font-weight:${high?'600':'500'};font-size:13px;color:${it.done?'#aaa':'#1a1a2e'};">${high?'<span style="color:#c2410c;">&#9873;</span> ':''}${esc(it.text)}</div>`;
-      if(it.meta) r+=`<div style="font-size:11px;color:#7c3aed;margin-top:2px;">${esc(it.meta)}</div>`;
-      if(it.body) r+=`<div style="font-size:11px;color:#888;margin-top:3px;line-height:1.4;">${esc(it.body.slice(0,120))}${it.body.length>120?'...':''}</div>`;
-      r+=`</td>`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;"><span style="font-size:10px;font-weight:600;color:${typeColors[it.kind]};background:${typeBg[it.kind]};padding:2px 8px;border-radius:10px;">${typeLabels[it.kind]}</span></td>`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;font-size:12px;color:${od?'#c2410c':ds?'#b45309':'#555'};${(od||ds)?'font-weight:600;':''}">${dateLabel}</td>`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;">${high?'<span style="font-size:10px;font-weight:600;color:#c2410c;background:#fff7ed;padding:2px 8px;border-radius:10px;">High</span>':'<span style="font-size:10px;color:#999;">Normal</span>'}</td>`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;">${it.customer?'<span style="font-size:10px;font-weight:500;color:#15803d;background:#f0fdf4;padding:2px 8px;border-radius:10px;">'+esc(it.customer)+'</span>':''}</td>`;
-      r+=`<td style="padding:8px 10px;vertical-align:top;font-size:11px;color:#777;">${(it.people||[]).map(p=>esc(p)).join(', ')}</td>`;
-      r+=`</tr>`;
-      return r;
-    };
+      (groups[label]=groups[label]||[]).push(it);
+    });
+    return {groups, typeLabels};
+  }
 
-    const sec=(title,icon,color,arr)=>{
-      if(!arr.length) return '';
-      arr.sort(sortByDatePriority);
-      return `<div style="margin-top:28px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${color};">
-          <span style="font-size:16px;">${icon}</span>
-          <h2 style="margin:0;font-size:15px;font-weight:700;color:${color};">${title}</h2>
-          <span style="font-size:12px;color:#999;font-weight:400;">${arr.length} item${arr.length>1?'s':''}</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse;">${thead}<tbody>${arr.map(row).join('')}</tbody></table>
-      </div>`;
-    };
-
-    const overdueItems=items.filter(isOverdueOrToday);
-    const meetingItems=items.filter(x=>x.kind==='meeting'&&!x.done&&!isOverdueOrToday(x));
-    const todoItems=items.filter(x=>!x.done&&x.kind==='todo'&&!isOverdueOrToday(x));
-    const reminderItems=items.filter(x=>!x.done&&x.kind==='reminder'&&!isOverdueOrToday(x));
-    const docItems=items.filter(x=>x.kind==='doc');
-    const doneItems=items.filter(x=>x.done);
+  function buildBriefingHtml(){
+    const today=dayjs().format('dddd, MMMM D, YYYY');
+    const {groups, typeLabels} = briefingDateGroups();
+    const typeColors={todo:'#2563eb',reminder:'#c2410c',meeting:'#7c3aed',doc:'#666'};
+    const typeBg={todo:'#eff6ff',reminder:'#fff7ed',meeting:'#f5f3ff',doc:'#f5f5f5'};
 
     const openCount=items.filter(x=>!x.done&&x.kind!=='doc').length;
-    const overdueCount=overdueItems.length;
-    const meetingCount=meetingItems.length;
+    const overdueCount=items.filter(isOverdueOrToday).length;
+    const meetingCount=items.filter(x=>x.kind==='meeting'&&!x.done).length;
 
     let body=`
       <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:28px 32px;border-radius:12px;margin-bottom:24px;">
         <h1 style="margin:0;font-size:24px;font-weight:700;color:white;letter-spacing:-0.3px;">AG Daily Briefing</h1>
         <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.75);">${today}</p>
       </div>
-      <div style="display:flex;gap:16px;margin-bottom:8px;">
+      <div style="display:flex;gap:16px;margin-bottom:24px;">
         <div style="flex:1;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px;">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:#8892a4;font-weight:600;">Open Items</div>
           <div style="font-size:28px;font-weight:700;color:#2563eb;margin-top:4px;">${openCount}</div>
@@ -1221,14 +1203,36 @@
         </div>
       </div>`;
 
-    body+=sec('Overdue / Due Today','&#9888;','#c2410c',overdueItems);
-    body+=sec('Meetings','&#128197;','#7c3aed',meetingItems);
-    body+=sec('To-dos','&#9744;','#2563eb',todoItems);
-    body+=sec('Reminders','&#128276;','#d97706',reminderItems);
-    body+=sec('Docs / Notes','&#128196;','#64748b',docItems);
-    if(doneItems.length) body+=sec('Completed','&#9989;','#15803d',doneItems);
+    Object.keys(groups).forEach(dayLabel=>{
+      const arr=groups[dayLabel];
+      const isOverdue=dayLabel==='Overdue';
+      const isToday=dayLabel.startsWith('Today');
+      const color=isOverdue?'#c2410c':isToday?'#2563eb':'#374151';
+      body+=`<div style="margin-bottom:24px;">
+        <div style="font-size:14px;font-weight:700;color:${color};padding-bottom:8px;border-bottom:2px solid ${isOverdue?'#fecaca':isToday?'#93c5fd':'#e5e7eb'};margin-bottom:10px;">${dayLabel} <span style="font-weight:400;color:#999;font-size:12px;">(${arr.length})</span></div>`;
+      arr.forEach(it=>{
+        const high=it.priority==='high';
+        body+=`<div style="padding:10px 14px;border:1px solid #f0f0f0;border-radius:8px;margin-bottom:6px;${high?'background:#fffbeb;border-left:3px solid #fb923c;':''}">
+          <div style="display:flex;align-items:flex-start;gap:10px;">
+            <span style="display:inline-block;width:13px;height:13px;border:1.5px solid #bbb;border-radius:3px;margin-top:2px;flex-shrink:0;"></span>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:${high?'600':'500'};color:#1a1a2e;">${high?'<span style="color:#c2410c;">&#9873;</span> ':''}${esc(it.text)}</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap;">
+                <span style="font-size:10px;font-weight:600;color:${typeColors[it.kind]};background:${typeBg[it.kind]};padding:2px 8px;border-radius:10px;">${typeLabels[it.kind]}</span>
+                ${it.customer?'<span style="font-size:10px;font-weight:500;color:#15803d;background:#f0fdf4;padding:2px 8px;border-radius:10px;">'+esc(it.customer)+'</span>':''}
+                ${(it.people||[]).length?'<span style="font-size:10px;color:#777;">'+it.people.map(p=>esc(p)).join(', ')+'</span>':''}
+                ${it.repeat==='weekly'?'<span style="font-size:10px;color:#2563eb;">&#8635; Weekly</span>':''}
+              </div>
+              ${it.meta?'<div style="font-size:11px;color:#7c3aed;margin-top:3px;">'+esc(it.meta)+'</div>':''}
+              ${it.body?'<div style="font-size:11px;color:#888;margin-top:3px;line-height:1.4;">'+esc(it.body.slice(0,150))+(it.body.length>150?'...':'')+'</div>':''}
+            </div>
+          </div>
+        </div>`;
+      });
+      body+=`</div>`;
+    });
 
-    body+=`<div style="margin-top:36px;padding-top:14px;border-top:2px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+    body+=`<div style="margin-top:32px;padding-top:14px;border-top:2px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
       <span style="font-size:11px;color:#aaa;">AG Daily Briefing</span>
       <span style="font-size:11px;color:#aaa;">Generated ${dayjs().format('MMM D, YYYY [at] h:mm A')}</span>
     </div>`;
@@ -1238,7 +1242,7 @@
 
   function briefingFullHtml(){
     const {today, body} = buildBriefingHtml();
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AG Daily Briefing — ${today}</title><style>body{font-family:'Inter',system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact;}table{font-size:13px;}@media print{body{margin:20px auto;}.no-print{display:none!important;}}</style></head><body>${body}</body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AG Daily Briefing — ${today}</title><style>body{font-family:'Inter',system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact;}@media print{body{margin:20px auto;}.no-print{display:none!important;}}</style></head><body>${body}</body></html>`;
   }
 
   function printBriefing(){
@@ -1247,69 +1251,32 @@
     w.document.close(); w.print();
   }
 
-  async function generatePdf(){
-    const html=briefingFullHtml();
-    const iframe=document.createElement('iframe');
-    iframe.style.cssText='position:fixed;left:-9999px;top:0;width:800px;height:auto;border:none;';
-    document.body.appendChild(iframe);
-    iframe.contentDocument.open();
-    iframe.contentDocument.write(html);
-    iframe.contentDocument.close();
-    await new Promise(r=>iframe.onload=r);
-    await new Promise(r=>setTimeout(r,300));
-    const el=iframe.contentDocument.body;
-    const canvas=await html2canvas(el,{scale:2,useCORS:true,width:760,windowWidth:800});
-    document.body.removeChild(iframe);
-    const {jsPDF}=window.jspdf;
-    const pageW=210, margin=10, contentW=pageW-margin*2;
-    const imgW=contentW, imgH=(canvas.height*contentW)/canvas.width;
-    const pageH=297, usableH=pageH-margin*2;
-    const pdf=new jsPDF('p','mm','a4');
-    let y=0, page=0;
-    while(y<imgH){
-      if(page>0) pdf.addPage();
-      const srcY=(y/imgH)*canvas.height;
-      const srcH=Math.min((usableH/imgH)*canvas.height, canvas.height-srcY);
-      const sliceCanvas=document.createElement('canvas');
-      sliceCanvas.width=canvas.width;
-      sliceCanvas.height=srcH;
-      sliceCanvas.getContext('2d').drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,srcH);
-      const sliceImg=sliceCanvas.toDataURL('image/png');
-      const sliceH=(srcH*contentW)/canvas.width;
-      pdf.addImage(sliceImg,'PNG',margin,margin,imgW,sliceH);
-      y+=usableH;
-      page++;
-    }
-    return pdf;
-  }
+  function emailBriefing(){
+    const {groups, typeLabels} = briefingDateGroups();
+    const today=dayjs().format('dddd, MMMM D, YYYY');
+    let text='AG DAILY BRIEFING\n'+today+'\n\n';
 
-  async function emailBriefing(){
-    const btn=$('btn-email');
-    const origText=btn.textContent;
-    btn.textContent='Generating PDF...';
-    btn.disabled=true;
-    try {
-      const pdf=await generatePdf();
-      const subject='AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
-      const filename=subject.replace(/[^a-zA-Z0-9 —-]/g,'')+'.pdf';
-      const blob=pdf.output('blob');
-      const file=new File([blob],filename,{type:'application/pdf'});
+    Object.keys(groups).forEach(dayLabel=>{
+      const arr=groups[dayLabel];
+      text+='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+      text+=dayLabel.toUpperCase()+' ('+arr.length+')\n';
+      text+='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+      arr.forEach(it=>{
+        const high=it.priority==='high';
+        let line='  '+(high?'[!] ':'    ')+'['+typeLabels[it.kind]+'] '+it.text;
+        if(it.customer) line+='\n        Customer: '+it.customer;
+        if(it.people&&it.people.length) line+='\n        People: '+it.people.join(', ');
+        if(it.meta) line+='\n        '+it.meta;
+        if(it.repeat==='weekly') line+='\n        Repeats weekly';
+        if(it.body) line+='\n        Note: '+it.body.slice(0,100)+(it.body.length>100?'...':'');
+        text+=line+'\n\n';
+      });
+    });
 
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        try {
-          await navigator.share({title:subject,files:[file]});
-          return;
-        } catch(e){ if(e.name==='AbortError') return; }
-      }
+    text+='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nGenerated '+dayjs().format('MMM D, YYYY [at] h:mm A')+'\n';
 
-      pdf.save(filename);
-      setTimeout(()=>{
-        window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent('AG Daily Briefing PDF is downloaded — attach it to this email.');
-      },500);
-    } finally {
-      btn.textContent=origText;
-      btn.disabled=false;
-    }
+    const subject='AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
+    window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
   }
 
   function renderCalendar(){
@@ -1430,6 +1397,21 @@
   $('btn-email').onclick=emailBriefing;
   $('view-list').onclick=()=>{currentView='list';switchView();};
   $('view-calendar').onclick=()=>{currentView='calendar';switchView();};
+
+  const themeBtn=$('btn-theme');
+  function applyTheme(t){
+    if(t==='light'){document.documentElement.setAttribute('data-theme','light');themeBtn.textContent='☾';}
+    else if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');themeBtn.textContent='☀';}
+    else{document.documentElement.removeAttribute('data-theme');themeBtn.textContent=window.matchMedia('(prefers-color-scheme:dark)').matches?'☀':'☾';}
+  }
+  const savedTheme=localStorage.getItem('agbriefing:theme')||'auto';
+  applyTheme(savedTheme);
+  themeBtn.onclick=()=>{
+    const cur=localStorage.getItem('agbriefing:theme')||'auto';
+    const next=cur==='auto'?'dark':cur==='dark'?'light':'auto';
+    localStorage.setItem('agbriefing:theme',next);
+    applyTheme(next);
+  };
 
   syncFields();
   initAuth();
