@@ -546,7 +546,7 @@
       </div>
       <select id="fperson" style="width:120px; padding:6px;"><option value="">Person: all</option></select>
       <select id="fcustomer" style="width:130px; padding:6px;"><option value="">Customer: all</option></select>
-      <button id="toggle-add" style="font-size:12px; padding:6px 14px; border-radius:20px; background:var(--accent); color:#fff; border:none; cursor:pointer; white-space:nowrap;">+ Add</button>
+      <button id="toggle-add" style="font-size:12px; padding:6px 14px; border-radius:20px; background:#16a34a; color:#fff; border:none; cursor:pointer; white-space:nowrap; font-weight:600;">+ Add</button>
     </div>
     <div id="typefilters" style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px; align-items:center;">
       <button data-filter="all" class="fbtn">All</button>
@@ -853,6 +853,7 @@
     items.push(it);
     entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';prioEl.value='normal';repeatEl.checked=false;
     saveItem(it); rebuildLinks(); render();
+    $('add-panel').style.display='none';$('toggle-add').textContent='+ Add';
   }
 
   function toggle(id){
