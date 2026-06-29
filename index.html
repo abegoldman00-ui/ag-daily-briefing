@@ -120,13 +120,11 @@
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
       <h2 style="font-size:18px; font-weight:500; margin:0; color:var(--text-primary);">AG Daily Briefing</h2>
       <div style="display:flex; gap:6px; align-items:center;">
-        <button id="btn-brief" style="font-size:13px; padding:4px 12px; background:var(--bg-accent); color:var(--text-accent); border-color:var(--border-accent);">Morning briefing</button>
         <button id="btn-print" style="font-size:13px; padding:4px 12px;">Print</button>
         <button id="btn-logout" style="font-size:12px; padding:4px 10px; color:var(--text-muted); border:none; background:none;">Sign out</button>
       </div>
     </div>
 
-    <div id="briefout" style="display:none; background:var(--surface-1); border-radius:12px; padding:1rem 1.25rem; margin-bottom:1.5rem;"></div>
 
     <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
       <div style="position:relative; flex:1; min-width:160px;">
@@ -250,7 +248,7 @@
   const listEl=$('list'),statsEl=$('stats'),entryEl=$('entry'),kindEl=$('kind'),mtimeEl=$('mtime'),
     docbodyEl=$('docbody'),peopleEl=$('people'),customerEl=$('customer'),dueEl=$('due'),prioEl=$('priority'),
     fPersonEl=$('fperson'),fCustomerEl=$('fcustomer'),clearLinksEl=$('clearlinks'),searchEl=$('search'),
-    briefOut=$('briefout'),custlist=$('custlist');
+    custlist=$('custlist');
 
   const kindMeta={
     todo:{label:'To-do',icon:'ti-checkbox',color:'var(--text-accent)',bg:'var(--bg-accent)'},
@@ -447,42 +445,6 @@
     listEl.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{fCustomer=b.getAttribute('data-fc');fPerson='';rebuildLinks();render();});
   }
 
-  // ===== BRIEFING =====
-  function dayPayload(){
-    const meetings=items.filter(x=>x.kind==='meeting'&&!x.done);
-    const due=items.filter(isOverdueOrToday);
-    const openTasks=items.filter(x=>!x.done&&(x.kind==='todo'||x.kind==='reminder')&&!isOverdueOrToday(x));
-    const notes=items.filter(x=>x.kind==='doc');
-    const fmt=it=>`- ${it.text}${it.priority==='high'?' [HIGH]':''}${it.customer?' · customer: '+it.customer:''}${(it.people||[]).length?' · '+it.people.join(', '):''}${it.meta?' · '+it.meta:''}${it.due?' · due '+it.due:''}`;
-    let p='Here is my workday board. Write me a tight morning briefing: lead with anything overdue or due today and high-priority items, then meetings in time order, then a short digest of the notes. Flag what deserves attention.\n\n';
-    p+='OVERDUE / DUE TODAY:\n'+(due.length?due.map(fmt).join('\n'):'(none)')+'\n\n';
-    p+='MEETINGS:\n'+(meetings.length?meetings.map(fmt).join('\n'):'(none)')+'\n\n';
-    p+='OTHER OPEN TASKS:\n'+(openTasks.length?openTasks.map(fmt).join('\n'):'(none)')+'\n\n';
-    p+='NOTES / DOCS:\n'+(notes.length?notes.map(it=>`- ${it.text}: ${(it.body||'').slice(0,500)}`).join('\n'):'(none)');
-    return p;
-  }
-
-  async function generateBriefing(){
-    if(items.length===0){ briefOut.style.display='block'; briefOut.innerHTML='<p style="margin:0; font-size:14px;">Add some items first.</p>'; return; }
-    briefOut.style.display='block';
-    briefOut.innerHTML='<div style="font-size:14px; color:var(--text-secondary);">Writing your briefing…</div>';
-    try{
-      const headers = { 'content-type': 'application/json' };
-      if (USE_SUPABASE && session) {
-        headers['authorization'] = `Bearer ${session.access_token}`;
-      }
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/morning-briefing`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ prompt: dayPayload() }),
-      });
-      const data = await res.json();
-      const text = data.text || '';
-      briefOut.innerHTML=`<div style="font-size:13px; font-weight:500; color:var(--text-accent); margin-bottom:8px;">Today's briefing</div><div style="font-size:14px; line-height:1.65; white-space:pre-wrap;">${esc(text)}</div>`;
-    }catch(e){
-      briefOut.innerHTML='<div style="font-size:14px; color:var(--text-secondary);">Briefing service unavailable. Make sure SUPABASE_URL is configured and the Edge Function is deployed.</div>';
-    }
-  }
 
   function printBriefing(){
     let w=window.open('','_blank');
@@ -505,7 +467,6 @@
   fCustomerEl.onchange=()=>{fCustomer=fCustomerEl.value;render();rebuildLinks();};
   clearLinksEl.onclick=()=>{fPerson='';fCustomer='';rebuildLinks();render();};
   searchEl.addEventListener('input',()=>{searchQ=searchEl.value.trim();render();});
-  $('btn-brief').onclick=generateBriefing;
   $('btn-print').onclick=printBriefing;
 
   syncFields();
