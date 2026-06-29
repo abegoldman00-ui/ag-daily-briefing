@@ -527,7 +527,7 @@
 
 <div id="app">
   <div id="ag-briefing-root" style="padding:0 1rem 2rem; max-width:760px; margin:0 auto;">
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 0 16px; flex-wrap:wrap; gap:8px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0 8px; flex-wrap:wrap; gap:6px;">
       <div>
         <h2 style="font-size:22px; font-weight:700; margin:0; color:var(--text-primary); letter-spacing:-0.3px;">AG Daily Briefing</h2>
         <p id="date-subtitle" style="margin:3px 0 0; font-size:13px; color:var(--text-muted);"></p>
@@ -540,23 +540,30 @@
       </div>
     </div>
 
-    <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
-      <div style="position:relative; flex:1; min-width:160px;">
-        <input id="search" type="text" placeholder="Search everything…" style="width:100%; box-sizing:border-box; padding-left:12px;" />
+    <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+      <div style="position:relative; flex:1; min-width:120px;">
+        <input id="search" type="text" placeholder="Search…" style="width:100%; box-sizing:border-box; padding-left:12px; padding-top:6px; padding-bottom:6px;" />
       </div>
-      <select id="fperson" style="width:140px;"><option value="">Person: all</option></select>
-      <select id="fcustomer" style="width:150px;"><option value="">Customer: all</option></select>
+      <select id="fperson" style="width:120px; padding:6px;"><option value="">Person: all</option></select>
+      <select id="fcustomer" style="width:130px; padding:6px;"><option value="">Customer: all</option></select>
+      <button id="toggle-add" style="font-size:12px; padding:6px 14px; border-radius:20px; background:var(--accent); color:#fff; border:none; cursor:pointer; white-space:nowrap;">+ Add</button>
     </div>
-    <div id="typefilters" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:1.75rem;">
+    <div id="typefilters" style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px; align-items:center;">
       <button data-filter="all" class="fbtn">All</button>
       <button data-filter="open" class="fbtn">Open</button>
       <button data-filter="today" class="fbtn">Today</button>
       <button data-filter="meeting" class="fbtn">Meetings</button>
       <button data-filter="doc" class="fbtn">Docs</button>
       <button id="clearlinks" style="display:none; font-size:12px; padding:6px 16px; border-radius:20px; color:var(--text-warning);">Clear filter</button>
+      <div style="margin-left:auto;">
+        <div class="view-toggle">
+          <button id="view-list" class="active">List</button>
+          <button id="view-calendar">Calendar</button>
+        </div>
+      </div>
     </div>
 
-    <div class="add-section">
+    <div id="add-panel" class="add-section" style="display:none;">
       <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
         <select id="kind" style="width:128px;">
           <option value="todo">To-do</option>
@@ -586,15 +593,7 @@
       </div>
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <div id="stats" class="stat-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; flex:1;"></div>
-    </div>
-    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-      <div class="view-toggle">
-        <button id="view-list" class="active">List</button>
-        <button id="view-calendar">Calendar</button>
-      </div>
-    </div>
+    <div id="stats" class="stat-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:8px;"></div>
     <div id="list-view">
       <div id="list"></div>
       <div id="completed-section"></div>
@@ -1395,6 +1394,7 @@
   searchEl.addEventListener('input',()=>{searchQ=searchEl.value.trim();render();});
   $('btn-print').onclick=printBriefing;
   $('btn-email').onclick=emailBriefing;
+  $('toggle-add').onclick=()=>{const p=$('add-panel');const show=p.style.display==='none';p.style.display=show?'':'none';$('toggle-add').textContent=show?'✕ Close':'+ Add';if(show)$('entry').focus();};
   $('view-list').onclick=()=>{currentView='list';switchView();};
   $('view-calendar').onclick=()=>{currentView='calendar';switchView();};
 
