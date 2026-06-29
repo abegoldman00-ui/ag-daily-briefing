@@ -9,9 +9,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     :root {
-      --surface-0: #f8f9fb;
+      --surface-0: #f5f6f8;
       --surface-1: #ffffff;
-      --surface-2: #f0f1f4;
+      --surface-2: #eef0f4;
       --text-primary: #1a1a2e;
       --text-secondary: #5a5a72;
       --text-muted: #9898ab;
@@ -25,20 +25,21 @@
       --bg-success: #f0fdf4;
       --bg-pro: #f5f3ff;
       --bg-due-soon: #fffbeb;
-      --border: #e2e4ea;
+      --border: #e5e7eb;
       --border-strong: #c5c8d0;
       --border-warning: #fb923c;
       --border-success: #4ade80;
       --border-accent: #93c5fd;
-      --radius: 10px;
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-md: 0 2px 8px rgba(0,0,0,0.06);
+      --radius: 12px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.1);
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --surface-0: #111118;
-        --surface-1: #1c1c27;
-        --surface-2: #26263a;
+        --surface-0: #0f0f17;
+        --surface-1: #1a1a27;
+        --surface-2: #24243a;
         --text-primary: #e8e8f0;
         --text-secondary: #a0a0b8;
         --text-muted: #6a6a80;
@@ -57,8 +58,9 @@
         --border-warning: #c2410c;
         --border-success: #15803d;
         --border-accent: #2563eb;
-        --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
-        --shadow-md: 0 2px 8px rgba(0,0,0,0.3);
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+        --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+        --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
       }
     }
     *, *::before, *::after { box-sizing: border-box; }
@@ -72,9 +74,9 @@
     input, select, textarea, button {
       font-family: inherit;
       font-size: 13px;
-      padding: 7px 12px;
+      padding: 8px 12px;
       border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border-radius: 8px;
       background: var(--surface-0);
       color: var(--text-primary);
       outline: none;
@@ -89,40 +91,51 @@
     textarea { resize: vertical; }
 
     #auth-screen {
-      max-width: 360px;
+      max-width: 380px;
       margin: 120px auto;
-      padding: 2rem;
+      padding: 2.5rem;
       text-align: center;
       background: var(--surface-1);
-      border-radius: 16px;
-      box-shadow: var(--shadow-md);
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
     }
-    #auth-screen h2 { margin: 0 0 0.5rem; font-size: 22px; font-weight: 600; }
+    #auth-screen h2 { margin: 0 0 0.5rem; font-size: 24px; font-weight: 700; }
     #auth-screen p { margin: 0 0 1.5rem; font-size: 13px; color: var(--text-muted); }
     #auth-screen input { width: 100%; margin-bottom: 10px; }
-    #auth-screen button { width: 100%; padding: 9px; font-weight: 500; }
+    #auth-screen button { width: 100%; padding: 10px; font-weight: 500; }
     #auth-error { color: var(--text-warning); font-size: 13px; margin-top: 8px; }
 
     #app { display: none; }
 
+    .header-bar {
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
     .stat-card {
       background: var(--surface-1);
       border-radius: var(--radius);
-      padding: 0.85rem 1rem;
+      padding: 1rem 1.15rem;
       box-shadow: var(--shadow-sm);
       border: 1px solid var(--border);
+      transition: box-shadow 0.15s;
     }
-    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 500; }
-    .stat-value { font-size: 24px; font-weight: 600; margin-top: 2px; }
+    .stat-card:hover { box-shadow: var(--shadow-md); }
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); font-weight: 500; }
+    .stat-value { font-size: 26px; font-weight: 700; margin-top: 4px; }
 
     .item-row {
-      padding: 12px 14px;
+      padding: 14px 16px;
       background: var(--surface-1);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       margin-bottom: 8px;
       box-shadow: var(--shadow-sm);
-      transition: box-shadow 0.15s, transform 0.15s;
+      transition: box-shadow 0.2s, transform 0.15s;
+      position: relative;
     }
     .item-row:hover { box-shadow: var(--shadow-md); }
     .item-row.high-priority {
@@ -136,6 +149,16 @@
     .item-row.dragging { opacity: 0.5; transform: scale(0.98); }
     .item-row.drag-over { border-top: 2px solid var(--text-accent); }
 
+    .item-actions {
+      display: flex;
+      gap: 2px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      flex: 0 0 auto;
+    }
+    .item-row:hover .item-actions { opacity: 1; }
+    @media (max-width: 600px) { .item-actions { opacity: 1; } }
+
     .tag {
       font-size: 11px;
       padding: 2px 8px;
@@ -146,7 +169,7 @@
 
     .fbtn {
       font-size: 12px;
-      padding: 5px 14px;
+      padding: 6px 16px;
       border-radius: 20px;
       font-weight: 500;
       transition: all 0.15s;
@@ -155,9 +178,9 @@
 
     .add-section {
       background: var(--surface-1);
-      border-radius: 14px;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-bottom: 1.75rem;
       box-shadow: var(--shadow-sm);
       border: 1px solid var(--border);
     }
@@ -167,7 +190,7 @@
       color: white;
       border-color: var(--text-accent);
       font-weight: 500;
-      padding: 7px 18px;
+      padding: 8px 20px;
     }
     .btn-primary:hover { opacity: 0.9; }
     .btn-danger {
@@ -175,7 +198,7 @@
       color: white;
       border-color: var(--text-warning);
       font-weight: 500;
-      padding: 7px 18px;
+      padding: 8px 20px;
     }
 
     .btn-ghost {
@@ -183,52 +206,84 @@
       background: none;
       color: var(--text-muted);
       padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
     }
-    .btn-ghost:hover { color: var(--text-primary); }
+    .btn-ghost:hover { color: var(--text-primary); background: var(--surface-2); }
+
+    .btn-icon {
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      padding: 4px 6px;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-icon:hover { color: var(--text-primary); background: var(--surface-2); }
+    .btn-icon.del:hover { color: var(--text-warning); background: var(--bg-warning); }
 
     .edit-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0,0,0,0.45);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 100;
+      backdrop-filter: blur(4px);
     }
     .edit-panel {
       background: var(--surface-1);
-      border-radius: 14px;
-      padding: 1.25rem;
+      border-radius: 16px;
+      padding: 1.5rem;
       width: 90%;
       max-width: 480px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      box-shadow: var(--shadow-lg);
       border: 1px solid var(--border);
     }
-    .edit-panel h3 { margin: 0 0 1rem; font-size: 16px; font-weight: 600; }
-    .edit-panel label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; margin-top: 10px; }
+    .edit-panel h3 { margin: 0 0 1rem; font-size: 17px; font-weight: 600; }
+    .edit-panel label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; margin-top: 12px; }
     .edit-panel input, .edit-panel select, .edit-panel textarea { width: 100%; margin-bottom: 2px; }
-    .edit-panel .edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .edit-panel .edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 
     .confirm-panel {
       background: var(--surface-1);
-      border-radius: 14px;
-      padding: 1.5rem;
+      border-radius: 16px;
+      padding: 1.75rem;
       width: 90%;
       max-width: 360px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      box-shadow: var(--shadow-lg);
       border: 1px solid var(--border);
       text-align: center;
     }
-    .confirm-panel h3 { margin: 0 0 0.5rem; font-size: 16px; font-weight: 600; }
+    .confirm-panel h3 { margin: 0 0 0.5rem; font-size: 17px; font-weight: 600; }
     .confirm-panel p { margin: 0 0 1.25rem; font-size: 13px; color: var(--text-secondary); }
     .confirm-panel .edit-actions { display: flex; gap: 8px; justify-content: center; }
 
-    .section-title {
-      font-size: 12px;
+    .section-header {
+      font-size: 13px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-header .count {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      padding: 1px 8px;
+      border-radius: 10px;
+    }
+
+    .section-group {
+      margin-bottom: 2rem;
     }
 
     .completed-toggle {
@@ -236,18 +291,19 @@
       align-items: center;
       gap: 8px;
       cursor: pointer;
-      padding: 10px 0;
+      padding: 12px 0;
       color: var(--text-muted);
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       border: none;
       background: none;
       width: 100%;
+      transition: color 0.15s;
     }
     .completed-toggle:hover { color: var(--text-secondary); }
-    .completed-toggle .arrow { transition: transform 0.2s; display: inline-block; }
+    .completed-toggle .arrow { transition: transform 0.2s; display: inline-block; font-size: 10px; }
     .completed-toggle .arrow.open { transform: rotate(90deg); }
 
     .drag-handle {
@@ -257,7 +313,11 @@
       padding: 0 4px;
       user-select: none;
       flex: 0 0 auto;
+      opacity: 0;
+      transition: opacity 0.15s;
     }
+    .item-row:hover .drag-handle { opacity: 1; }
+    @media (max-width: 600px) { .drag-handle { opacity: 0.5; } }
     .drag-handle:active { cursor: grabbing; }
 
     .undo-toast {
@@ -267,15 +327,15 @@
       transform: translateX(-50%);
       background: var(--text-primary);
       color: var(--surface-0);
-      padding: 10px 20px;
-      border-radius: 10px;
+      padding: 12px 24px;
+      border-radius: 12px;
       font-size: 13px;
       font-weight: 500;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      box-shadow: var(--shadow-lg);
       z-index: 200;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
     .undo-toast button {
       background: none;
@@ -287,6 +347,19 @@
       cursor: pointer;
     }
 
+    .relative-date {
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 1.5rem;
+      color: var(--text-muted);
+    }
+    .empty-state p { margin: 0; font-size: 14px; }
+    .empty-state .empty-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+
     @media (max-width: 600px) {
       .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
     }
@@ -295,13 +368,14 @@
       #auth-screen, #app > div:first-child button, .fbtn, #clearlinks,
       #search, #fperson, #fcustomer, #typefilters, .add-section,
       button[data-del], button[data-toggle], button[data-expand], button[data-edit],
-      .edit-overlay, .drag-handle, .completed-toggle, .undo-toast { display: none !important; }
+      .edit-overlay, .drag-handle, .completed-toggle, .undo-toast,
+      .item-actions, .header-bar { display: none !important; }
       body { background: white; color: black; }
       .item-row { box-shadow: none; border: 1px solid #ddd; }
     }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -316,14 +390,14 @@
 </div>
 
 <div id="app">
-  <div id="ag-briefing-root" style="padding:1rem 1rem; max-width:740px; margin:0 auto;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:8px;">
+  <div id="ag-briefing-root" style="padding:0 1rem 2rem; max-width:760px; margin:0 auto;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 0 16px; flex-wrap:wrap; gap:8px;">
       <div>
-        <h2 style="font-size:20px; font-weight:600; margin:0; color:var(--text-primary);">AG Daily Briefing</h2>
-        <p id="date-subtitle" style="margin:2px 0 0; font-size:13px; color:var(--text-muted);"></p>
+        <h2 style="font-size:22px; font-weight:700; margin:0; color:var(--text-primary); letter-spacing:-0.3px;">AG Daily Briefing</h2>
+        <p id="date-subtitle" style="margin:3px 0 0; font-size:13px; color:var(--text-muted);"></p>
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
-        <button id="btn-print" style="font-size:12px; padding:5px 14px; border-radius:20px;">Print</button>
+        <button id="btn-print" style="font-size:12px; padding:6px 16px; border-radius:20px;">Print</button>
         <button id="btn-logout" class="btn-ghost" style="font-size:12px;">Sign out</button>
       </div>
     </div>
@@ -335,13 +409,13 @@
       <select id="fperson" style="width:140px;"><option value="">Person: all</option></select>
       <select id="fcustomer" style="width:150px;"><option value="">Customer: all</option></select>
     </div>
-    <div id="typefilters" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:1.5rem;">
+    <div id="typefilters" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:1.75rem;">
       <button data-filter="all" class="fbtn">All</button>
       <button data-filter="open" class="fbtn">Open</button>
       <button data-filter="today" class="fbtn">Today</button>
       <button data-filter="meeting" class="fbtn">Meetings</button>
       <button data-filter="doc" class="fbtn">Docs</button>
-      <button id="clearlinks" style="display:none; font-size:12px; padding:5px 14px; border-radius:20px; color:var(--text-warning);">Clear filter</button>
+      <button id="clearlinks" style="display:none; font-size:12px; padding:6px 16px; border-radius:20px; color:var(--text-warning);">Clear filter</button>
     </div>
 
     <div class="add-section">
@@ -371,7 +445,7 @@
       </div>
     </div>
 
-    <div id="stats" class="stat-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.5rem;"></div>
+    <div id="stats" class="stat-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.75rem;"></div>
     <div id="list"></div>
     <div id="completed-section"></div>
   </div>
@@ -460,7 +534,6 @@
   };
 
   function todayISO(){ return dayjs().format('YYYY-MM-DD'); }
-  function dayLabel(d){ return dayjs(d).format('dddd, MMM D'); }
   function parsePeople(s){ return (s||'').split(',').map(x=>x.trim()).filter(Boolean); }
   function isOverdueOrToday(it){ return it.due && !it.done && (it.kind==='todo'||it.kind==='reminder') && dayjs(it.due).isBefore(dayjs(todayISO()).add(1,'day')); }
   function isDueSoon(it){
@@ -468,6 +541,39 @@
     const d=dayjs(it.due), today=dayjs(todayISO());
     return d.isAfter(today) && d.isBefore(today.add(3,'day'));
   }
+
+  function friendlyDate(dateStr){
+    if(!dateStr) return '';
+    const d=dayjs(dateStr), today=dayjs(todayISO());
+    const diff=d.diff(today,'day');
+    if(diff === 0) return 'Today';
+    if(diff === 1) return 'Tomorrow';
+    if(diff === -1) return 'Yesterday';
+    if(diff < -1) return d.format('MMM D') + ' · ' + Math.abs(diff) + 'd overdue';
+    if(diff <= 7) return d.format('ddd, MMM D');
+    return d.format('MMM D');
+  }
+
+  function dateGroupKey(it){
+    if(!it.due) return 'no-date';
+    const d=dayjs(it.due), today=dayjs(todayISO());
+    const diff=d.diff(today,'day');
+    if(diff < 0) return 'overdue';
+    if(diff === 0) return 'today';
+    if(diff === 1) return 'tomorrow';
+    if(diff <= 7) return 'this-week';
+    return 'later';
+  }
+
+  const groupLabels = {
+    'overdue': { label: 'Overdue', color: 'var(--text-warning)' },
+    'today': { label: 'Today', color: 'var(--text-accent)' },
+    'tomorrow': { label: 'Tomorrow', color: 'var(--text-primary)' },
+    'this-week': { label: 'This Week', color: 'var(--text-secondary)' },
+    'later': { label: 'Later', color: 'var(--text-muted)' },
+    'no-date': { label: 'No due date', color: 'var(--text-muted)' }
+  };
+  const groupOrder = ['overdue','today','tomorrow','this-week','later','no-date'];
 
   function syncFields(){
     const k=kindEl.value;
@@ -553,7 +659,7 @@
       <h3>Delete item?</h3>
       <p>"${esc(it.text)}" will be permanently removed.</p>
       <div class="edit-actions">
-        <button id="del-cancel" style="padding:7px 16px;">Cancel</button>
+        <button id="del-cancel" style="padding:8px 18px;">Cancel</button>
         <button id="del-confirm" class="btn-danger">Delete</button>
       </div>
     </div>`;
@@ -619,7 +725,7 @@
       <label>Notes</label>
       <textarea id="ed-body" style="min-height:80px;">${esc(it.body)}</textarea>
       <div class="edit-actions">
-        <button id="ed-cancel" style="padding:7px 16px;">Cancel</button>
+        <button id="ed-cancel" style="padding:8px 18px;">Cancel</button>
         <button id="ed-save" class="btn-primary">Save</button>
       </div>
     </div>`;
@@ -661,7 +767,7 @@
     const today=todayISO();
     let shown=items.filter(x=>!x.done);
     if(filter==='open') shown=shown.filter(x=>x.kind!=='doc');
-    else if(filter==='today') shown=shown.filter(x=>dayjs(x.ts).format('YYYY-MM-DD')===today);
+    else if(filter==='today') shown=shown.filter(x=>x.due===today || isOverdueOrToday(x));
     else if(filter==='meeting') shown=shown.filter(x=>x.kind==='meeting');
     else if(filter==='doc') shown=shown.filter(x=>x.kind==='doc');
     if(fPerson) shown=shown.filter(x=>(x.people||[]).includes(fPerson));
@@ -684,27 +790,30 @@
 
     if(shown.length===0){
       const note=(fPerson||fCustomer||searchQ)?'No items match this filter.':'Nothing here yet. Add your first item above.';
-      listEl.innerHTML=`<div style="text-align:center; padding:3rem 1rem; color:var(--text-muted);"><p style="margin:0; font-size:14px;">${note}</p></div>`;
+      listEl.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><p>${note}</p></div>`;
     } else {
       let html='';
-      const pinned=shown.filter(isOverdueOrToday).sort((a,b)=>(a.due<b.due?-1:1));
-      if(pinned.length && filter!=='doc' && filter!=='meeting'){
-        html+=`<div style="margin-bottom:1.5rem;"><div class="section-title" style="color:var(--text-warning);">Overdue / due today</div>`;
-        pinned.forEach(it=>html+=rowHtml(it));
-        html+=`</div>`;
-      }
-      const pinnedIds=new Set(pinned.map(x=>x.id));
-      const rest=shown.filter(x=>!pinnedIds.has(x.id));
       const groups={};
-      rest.sort((a,b)=>{
+      shown.sort((a,b)=>{
+        if(a.priority==='high'&&b.priority!=='high') return -1;
+        if(b.priority==='high'&&a.priority!=='high') return 1;
+        if(a.due&&b.due) return a.due<b.due?-1:a.due>b.due?1:0;
+        if(a.due) return -1;
+        if(b.due) return 1;
         const ao=a.sortOrder||0, bo=b.sortOrder||0;
         if(ao!==bo) return bo-ao;
         return b.ts-a.ts;
-      }).forEach(it=>{const k=dayLabel(it.ts);(groups[k]=groups[k]||[]).push(it);});
-      Object.keys(groups).forEach(day=>{
-        const isToday=day===dayLabel(Date.now());
-        html+=`<div style="margin-bottom:1.5rem;"><div class="section-title" style="color:${isToday?'var(--text-accent)':'var(--text-muted)'};">${day}${isToday?' · today':''}</div>`;
-        groups[day].forEach(it=>html+=rowHtml(it));
+      }).forEach(it=>{
+        const gk=dateGroupKey(it);
+        (groups[gk]=groups[gk]||[]).push(it);
+      });
+
+      groupOrder.forEach(gk=>{
+        if(!groups[gk]||!groups[gk].length) return;
+        const g=groupLabels[gk];
+        html+=`<div class="section-group">`;
+        html+=`<div class="section-header" style="color:${g.color};">${g.label} <span class="count">${groups[gk].length}</span></div>`;
+        groups[gk].forEach(it=>html+=rowHtml(it));
         html+=`</div>`;
       });
       listEl.innerHTML=html;
@@ -717,7 +826,7 @@
     doneItems=doneItems.filter(matchSearch);
 
     if(doneItems.length > 0){
-      let chtml=`<button class="completed-toggle" id="toggle-completed"><span class="arrow${showCompleted?' open':''}">▶</span> Completed (${doneItems.length})</button>`;
+      let chtml=`<button class="completed-toggle" id="toggle-completed"><span class="arrow${showCompleted?' open':''}">▶</span> Completed <span class="count" style="font-size:11px; font-weight:500; color:var(--text-muted); background:var(--surface-2); padding:1px 8px; border-radius:10px;">${doneItems.length}</span></button>`;
       if(showCompleted){
         chtml+=`<div style="margin-bottom:1.5rem;">`;
         doneItems.sort((a,b)=>b.ts-a.ts).forEach(it=>chtml+=rowHtml(it));
@@ -741,30 +850,31 @@
     if(high) cls+=' high-priority';
     else if(dueSoon) cls+=' due-soon';
     let h=`<div class="${cls}" draggable="true" data-drag-id="${it.id}">`;
-    h+=`<div style="display:flex; align-items:flex-start; gap:8px;">`;
+    h+=`<div style="display:flex; align-items:flex-start; gap:10px;">`;
     if(!it.done) h+=`<span class="drag-handle" title="Drag to reorder">⠿</span>`;
-    if(canCheck) h+=`<button data-toggle="${it.id}" style="flex:0 0 auto; width:20px; height:20px; padding:0; border-radius:50%; border:2px solid ${it.done?'var(--text-success)':'var(--border-strong)'}; ${it.done?'background:var(--text-success); color:white;':'background:none;'} font-size:12px; line-height:16px; text-align:center;">${it.done?'✓':''}</button>`;
-    else h+=`<span style="flex:0 0 auto; width:20px; text-align:center; color:var(--text-muted);">·</span>`;
-    h+=`<div style="flex:1; min-width:0;"><div style="font-size:14px; font-weight:500; color:var(--text-primary); ${it.done?'text-decoration:line-through; color:var(--text-muted); font-weight:400;':''}">${high?'⚑ ':''}${esc(it.text)}</div>`;
-    h+=`<div style="display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap;">`;
+    if(canCheck) h+=`<button data-toggle="${it.id}" style="flex:0 0 auto; width:20px; height:20px; padding:0; border-radius:50%; border:2px solid ${it.done?'var(--text-success)':'var(--border-strong)'}; ${it.done?'background:var(--text-success); color:white;':'background:none;'} font-size:12px; line-height:16px; text-align:center; margin-top:1px; transition: border-color 0.15s;">${it.done?'✓':''}</button>`;
+    else h+=`<span style="flex:0 0 auto; width:20px; text-align:center; color:var(--text-muted); margin-top:1px;">·</span>`;
+    h+=`<div style="flex:1; min-width:0;">`;
+    h+=`<div style="font-size:14px; font-weight:${it.done?'400':'500'}; color:${it.done?'var(--text-muted)':'var(--text-primary)'}; ${it.done?'text-decoration:line-through;':''} line-height:1.4;">${high?'<span style="color:var(--text-warning);">⚑</span> ':''}${esc(it.text)}</div>`;
+    h+=`<div style="display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap;">`;
     h+=`<span class="tag" style="background:${m.bg}; color:${m.color};">${m.label}</span>`;
     if(it.meta) h+=`<span style="font-size:11px; color:var(--text-pro);">${esc(it.meta)}</span>`;
     if(it.due){
       const od=isOverdueOrToday(it);
       const ds=isDueSoon(it);
       let dueColor=od?'var(--text-warning)':ds?'var(--text-due-soon)':'var(--text-muted)';
-      let dueLabel=it.kind==='meeting'?'':'due ';
-      if(ds&&!od) dueLabel='due soon · ';
-      h+=`<span style="font-size:11px; color:${dueColor}; ${ds&&!od?'font-weight:500;':''}">${dueLabel}${dayjs(it.due).format('MMM D')}</span>`;
+      h+=`<span class="relative-date" style="color:${dueColor}; ${(od||ds)?'font-weight:600;':''}">${friendlyDate(it.due)}</span>`;
     }
     if(it.customer) h+=`<span data-fc="${esc(it.customer)}" class="tag" style="background:var(--bg-success); color:var(--text-success); cursor:pointer;">${esc(it.customer)}</span>`;
     (it.people||[]).forEach(p=>h+=`<span data-fp="${esc(p)}" class="tag" style="background:var(--surface-2); color:var(--text-secondary); cursor:pointer;">${esc(p)}</span>`);
     if(it.body) h+=`<button data-expand="${it.id}" class="btn-ghost" style="font-size:11px; padding:1px 6px; color:var(--text-accent);">${it._open?'Hide notes':'Notes'}</button>`;
     h+=`</div></div>`;
-    h+=`<button data-edit="${it.id}" class="btn-ghost" style="flex:0 0 auto; font-size:12px; padding:2px 6px;">Edit</button>`;
-    h+=`<button data-del="${it.id}" class="btn-ghost" style="flex:0 0 auto; font-size:16px; padding:0 4px; line-height:1;">×</button>`;
+    h+=`<div class="item-actions">`;
+    h+=`<button data-edit="${it.id}" class="btn-icon" title="Edit">✎</button>`;
+    h+=`<button data-del="${it.id}" class="btn-icon del" title="Delete">×</button>`;
     h+=`</div>`;
-    if(it.body&&it._open) h+=`<div style="margin-top:10px; padding:10px 14px; background:var(--surface-0); border:1px solid var(--border); border-radius:var(--radius); font-size:13px; line-height:1.6; white-space:pre-wrap; color:var(--text-secondary);">${esc(it.body)}</div>`;
+    h+=`</div>`;
+    if(it.body&&it._open) h+=`<div style="margin-top:10px; padding:10px 14px; background:var(--surface-0); border:1px solid var(--border); border-radius:8px; font-size:13px; line-height:1.6; white-space:pre-wrap; color:var(--text-secondary);">${esc(it.body)}</div>`;
     h+=`</div>`;
     return h;
   }
@@ -777,7 +887,6 @@
     document.querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>{fPerson=b.getAttribute('data-fp');fCustomer='';rebuildLinks();render();});
     document.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{fCustomer=b.getAttribute('data-fc');fPerson='';rebuildLinks();render();});
 
-    // Drag and drop
     document.querySelectorAll('[data-drag-id]').forEach(el=>{
       el.addEventListener('dragstart',(e)=>{
         dragId=el.getAttribute('data-drag-id');
