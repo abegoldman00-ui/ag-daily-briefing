@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AG Daily Briefing</title>
+  <script src="config.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    :root {
+      --surface-0: #ffffff;
+      --surface-1: #f5f5f5;
+      --surface-2: #ebebeb;
+      --text-primary: #1a1a1a;
+      --text-secondary: #555555;
+      --text-muted: #999999;
+      --text-accent: #2563eb;
+      --text-warning: #d97706;
+      --text-success: #16a34a;
+      --text-pro: #7c3aed;
+      --bg-accent: #dbeafe;
+      --bg-warning: #fef3c7;
+      --bg-success: #dcfce7;
+      --bg-pro: #ede9fe;
+      --border: #e0e0e0;
+      --border-strong: #bbb;
+      --border-warning: #f59e0b;
+      --border-success: #22c55e;
+      --border-accent: #3b82f6;
+      --radius: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --surface-0: #1a1a1a;
+        --surface-1: #252525;
+        --surface-2: #333333;
+        --text-primary: #e5e5e5;
+        --text-secondary: #aaaaaa;
+        --text-muted: #777777;
+        --text-accent: #60a5fa;
+        --text-warning: #fbbf24;
+        --text-success: #4ade80;
+        --text-pro: #a78bfa;
+        --bg-accent: #1e3a5f;
+        --bg-warning: #422006;
+        --bg-success: #052e16;
+        --bg-pro: #2e1065;
+        --border: #333333;
+        --border-strong: #555555;
+        --border-warning: #d97706;
+        --border-success: #16a34a;
+        --border-accent: #2563eb;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--surface-0);
+      color: var(--text-primary);
+    }
+    input, select, textarea, button {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-0);
+      color: var(--text-primary);
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--border-accent);
+    }
+    button { cursor: pointer; }
+    textarea { resize: vertical; }
+
+    #auth-screen {
+      max-width: 360px;
+      margin: 120px auto;
+      padding: 2rem;
+      text-align: center;
+    }
+    #auth-screen h2 { margin: 0 0 1.5rem; font-size: 20px; font-weight: 500; }
+    #auth-screen input { width: 100%; margin-bottom: 10px; }
+    #auth-screen button {
+      width: 100%;
+      padding: 8px;
+      background: var(--bg-accent);
+      color: var(--text-accent);
+      border-color: var(--border-accent);
+      font-weight: 500;
+    }
+    #auth-error { color: var(--text-warning); font-size: 13px; margin-top: 8px; }
+
+    #app { display: none; }
+
+    @media print {
+      #auth-screen, #app > div:first-child button, .fbtn, #clearlinks,
+      #search, #fperson, #fcustomer, #typefilters, .add-section,
+      button[data-del], button[data-toggle], button[data-expand] { display: none !important; }
+      body { background: white; color: black; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <h2>AG Daily Briefing</h2>
+  <input id="auth-email" type="email" placeholder="Email" />
+  <input id="auth-pass" type="password" placeholder="Password" />
+  <button id="auth-login">Sign in</button>
+  <button id="auth-signup" style="margin-top:6px; background:var(--surface-1); color:var(--text-secondary); border-color:var(--border);">Create account</button>
+  <div id="auth-error"></div>
+</div>
+
+<div id="app">
+  <div id="ag-briefing-root" style="padding:0.5rem 1rem; max-width:720px; margin:0 auto;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
+      <h2 style="font-size:18px; font-weight:500; margin:0; color:var(--text-primary);">AG Daily Briefing</h2>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button id="btn-brief" style="font-size:13px; padding:4px 12px; background:var(--bg-accent); color:var(--text-accent); border-color:var(--border-accent);">Morning briefing</button>
+        <button id="btn-print" style="font-size:13px; padding:4px 12px;">Print</button>
+        <button id="btn-logout" style="font-size:12px; padding:4px 10px; color:var(--text-muted); border:none; background:none;">Sign out</button>
+      </div>
+    </div>
+
+    <div id="briefout" style="display:none; background:var(--surface-1); border-radius:12px; padding:1rem 1.25rem; margin-bottom:1.5rem;"></div>
+
+    <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+      <div style="position:relative; flex:1; min-width:160px;">
+        <input id="search" type="text" placeholder="Search everything…" style="width:100%; box-sizing:border-box;" />
+      </div>
+      <select id="fperson" style="width:140px;"><option value="">Person: all</option></select>
+      <select id="fcustomer" style="width:150px;"><option value="">Customer: all</option></select>
+    </div>
+    <div id="typefilters" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:1.25rem;">
+      <button data-filter="all" class="fbtn">All</button>
+      <button data-filter="open" class="fbtn">Open</button>
+      <button data-filter="today" class="fbtn">Today</button>
+      <button data-filter="meeting" class="fbtn">Meetings</button>
+      <button data-filter="doc" class="fbtn">Docs</button>
+      <button id="clearlinks" style="display:none;">Clear filter</button>
+    </div>
+
+    <div class="add-section" style="background:var(--surface-1); border-radius:12px; padding:0.85rem; margin-bottom:1.5rem;">
+      <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+        <select id="kind" style="width:128px;">
+          <option value="todo">To-do</option>
+          <option value="reminder">Reminder</option>
+          <option value="meeting">Meeting</option>
+          <option value="doc">Doc / note</option>
+        </select>
+        <input id="entry" type="text" placeholder="Add an item…" style="flex:1; min-width:150px;" />
+        <select id="priority" style="width:120px;">
+          <option value="normal">Normal</option>
+          <option value="high">High priority</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+        <input id="people" type="text" placeholder="People (comma-separated)" style="flex:1; min-width:140px;" />
+        <input id="customer" type="text" placeholder="Customer" list="custlist" style="flex:1; min-width:140px;" />
+        <datalist id="custlist"></datalist>
+        <input id="due" type="date" style="width:150px;" title="Due date" />
+      </div>
+      <input id="mtime" type="text" placeholder="Meeting time / location" style="width:100%; margin-bottom:8px; display:none; box-sizing:border-box;" />
+      <textarea id="docbody" placeholder="Paste the note, email, or doc text here…" style="width:100%; min-height:90px; margin-bottom:8px; display:none; box-sizing:border-box;"></textarea>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <span style="font-size:12px; color:var(--text-muted);">Saves automatically.</span>
+        <button id="add" style="background:var(--bg-accent); color:var(--text-accent); border-color:var(--border-accent);">Add</button>
+      </div>
+    </div>
+
+    <div id="stats" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:1.5rem;"></div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ===== CONFIG =====
+  const SUPABASE_URL = window.__SUPABASE_URL || '';
+  const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY || '';
+  const USE_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+  let supabase = null;
+  let session = null;
+
+  if (USE_SUPABASE) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+
+  // ===== AUTH =====
+  const authScreen = document.getElementById('auth-screen');
+  const appEl = document.getElementById('app');
+  const authError = document.getElementById('auth-error');
+
+  async function initAuth() {
+    if (!USE_SUPABASE) {
+      showApp();
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      session = data.session;
+      showApp();
+    }
+    supabase.auth.onAuthStateChange((_event, s) => {
+      session = s;
+      if (s) showApp(); else showAuth();
+    });
+  }
+
+  function showApp() {
+    authScreen.style.display = 'none';
+    appEl.style.display = 'block';
+    load();
+  }
+  function showAuth() {
+    authScreen.style.display = '';
+    appEl.style.display = 'none';
+  }
+
+  document.getElementById('auth-login').onclick = async () => {
+    authError.textContent = '';
+    const email = document.getElementById('auth-email').value;
+    const pass = document.getElementById('auth-pass').value;
+    if (!USE_SUPABASE) { showApp(); return; }
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) authError.textContent = error.message;
+  };
+  document.getElementById('auth-signup').onclick = async () => {
+    authError.textContent = '';
+    const email = document.getElementById('auth-email').value;
+    const pass = document.getElementById('auth-pass').value;
+    if (!USE_SUPABASE) { showApp(); return; }
+    const { error } = await supabase.auth.signUp({ email, password: pass });
+    if (error) authError.textContent = error.message;
+    else authError.textContent = 'Check your email for a confirmation link.';
+  };
+  document.getElementById('btn-logout').onclick = async () => {
+    if (USE_SUPABASE) await supabase.auth.signOut();
+    else showAuth();
+  };
+
+  // ===== APP LOGIC =====
+  const LSKEY = 'agbriefing:items:v2';
+  let items = [], filter = 'all', fPerson = '', fCustomer = '', searchQ = '';
+  const $ = id => document.getElementById(id);
+  const listEl=$('list'),statsEl=$('stats'),entryEl=$('entry'),kindEl=$('kind'),mtimeEl=$('mtime'),
+    docbodyEl=$('docbody'),peopleEl=$('people'),customerEl=$('customer'),dueEl=$('due'),prioEl=$('priority'),
+    fPersonEl=$('fperson'),fCustomerEl=$('fcustomer'),clearLinksEl=$('clearlinks'),searchEl=$('search'),
+    briefOut=$('briefout'),custlist=$('custlist');
+
+  const kindMeta={
+    todo:{label:'To-do',icon:'ti-checkbox',color:'var(--text-accent)',bg:'var(--bg-accent)'},
+    reminder:{label:'Reminder',icon:'ti-bell',color:'var(--text-warning)',bg:'var(--bg-warning)'},
+    meeting:{label:'Meeting',icon:'ti-users',color:'var(--text-pro)',bg:'var(--bg-pro)'},
+    doc:{label:'Doc / note',icon:'ti-file-text',color:'var(--text-secondary)',bg:'var(--surface-2)'}
+  };
+
+  function todayISO(){ return dayjs().format('YYYY-MM-DD'); }
+  function dayLabel(d){ return dayjs(d).format('dddd, MMM D'); }
+  function parsePeople(s){ return (s||'').split(',').map(x=>x.trim()).filter(Boolean); }
+  function isOverdueOrToday(it){ return it.due && !it.done && (it.kind==='todo'||it.kind==='reminder') && dayjs(it.due).isBefore(dayjs(todayISO()).add(1,'day')); }
+
+  function syncFields(){
+    const k=kindEl.value;
+    mtimeEl.style.display=k==='meeting'?'':'none';
+    docbodyEl.style.display=k==='doc'?'':'none';
+    dueEl.style.display=(k==='todo'||k==='reminder')?'':'none';
+    prioEl.style.display=k==='doc'?'none':'';
+    entryEl.placeholder=k==='meeting'?'Meeting subject…':k==='doc'?'Title for this note…':'Add an item…';
+  }
+  kindEl.addEventListener('change',syncFields);
+
+  // ===== STORAGE =====
+  async function load(){
+    if (USE_SUPABASE) {
+      const { data, error } = await supabase.from('items').select('*').order('created_at', { ascending: false });
+      if (error) { console.error('load error:', error); items = []; }
+      else {
+        items = (data || []).map(row => ({
+          id: row.id,
+          text: row.text,
+          kind: row.kind,
+          done: row.done,
+          ts: new Date(row.created_at).getTime(),
+          people: row.people || [],
+          customer: row.customer || '',
+          priority: row.priority,
+          due: row.due || '',
+          meta: row.meta || '',
+          body: row.body || ''
+        }));
+      }
+    } else {
+      try { items = JSON.parse(localStorage.getItem(LSKEY) || '[]'); } catch(e) { items = []; }
+    }
+    rebuildLinks(); render();
+  }
+
+  async function save(){
+    if (!USE_SUPABASE) {
+      try { localStorage.setItem(LSKEY, JSON.stringify(items)); } catch(e) {}
+    }
+  }
+
+  async function saveItem(it) {
+    if (USE_SUPABASE) {
+      const row = {
+        id: it.id,
+        kind: it.kind,
+        text: it.text,
+        body: it.body || null,
+        meta: it.meta || null,
+        people: it.people || [],
+        customer: it.customer || null,
+        priority: it.priority,
+        due: it.due || null,
+        done: it.done
+      };
+      const { error } = await supabase.from('items').upsert(row);
+      if (error) console.error('save error:', error);
+    } else {
+      save();
+    }
+  }
+
+  async function deleteItem(id) {
+    if (USE_SUPABASE) {
+      const { error } = await supabase.from('items').delete().eq('id', id);
+      if (error) console.error('delete error:', error);
+    } else {
+      save();
+    }
+  }
+
+  // ===== ACTIONS =====
+  function addItem(){
+    const text=entryEl.value.trim(),k=kindEl.value;
+    if(!text) return;
+    const id = USE_SUPABASE ? crypto.randomUUID() : 'i'+Date.now();
+    const it={id,text,kind:k,done:false,ts:Date.now(),
+      people:parsePeople(peopleEl.value),customer:customerEl.value.trim(),
+      priority:prioEl.value,due:(k==='todo'||k==='reminder')?dueEl.value:''};
+    if(k==='meeting') it.meta=mtimeEl.value.trim();
+    if(k==='doc') it.body=docbodyEl.value.trim();
+    items.push(it);
+    entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';prioEl.value='normal';
+    saveItem(it); rebuildLinks(); render();
+  }
+  function toggle(id){const it=items.find(x=>x.id===id);if(it){it.done=!it.done;saveItem(it);render();}}
+  function del(id){items=items.filter(x=>x.id!==id);deleteItem(id);rebuildLinks();render();}
+  function expand(id){const it=items.find(x=>x.id===id);if(it){it._open=!it._open;render();}}
+
+  function rebuildLinks(){
+    const ppl=new Set(),cust=new Set();
+    items.forEach(it=>{(it.people||[]).forEach(p=>ppl.add(p));if(it.customer)cust.add(it.customer);});
+    if(fPerson&&!ppl.has(fPerson))fPerson='';
+    if(fCustomer&&!cust.has(fCustomer))fCustomer='';
+    fPersonEl.innerHTML='<option value="">Person: all</option>'+[...ppl].sort().map(p=>`<option value="${esc(p)}"${p===fPerson?' selected':''}>${esc(p)}</option>`).join('');
+    fCustomerEl.innerHTML='<option value="">Customer: all</option>'+[...cust].sort().map(c=>`<option value="${esc(c)}"${c===fCustomer?' selected':''}>${esc(c)}</option>`).join('');
+    custlist.innerHTML=[...cust].sort().map(c=>`<option value="${esc(c)}">`).join('');
+    clearLinksEl.style.display=(fPerson||fCustomer)?'':'none';
+  }
+
+  function matchSearch(it){
+    if(!searchQ) return true;
+    const q=searchQ.toLowerCase();
+    return [it.text,it.body,it.customer,it.meta,(it.people||[]).join(' ')].filter(Boolean).some(s=>s.toLowerCase().includes(q));
+  }
+
+  function render(){
+    const today=todayISO();
+    let shown=items.slice();
+    if(filter==='open') shown=shown.filter(x=>!x.done&&x.kind!=='doc');
+    else if(filter==='today') shown=shown.filter(x=>dayjs(x.ts).format('YYYY-MM-DD')===today);
+    else if(filter==='meeting') shown=shown.filter(x=>x.kind==='meeting');
+    else if(filter==='doc') shown=shown.filter(x=>x.kind==='doc');
+    if(fPerson) shown=shown.filter(x=>(x.people||[]).includes(fPerson));
+    if(fCustomer) shown=shown.filter(x=>x.customer===fCustomer);
+    shown=shown.filter(matchSearch);
+
+    document.querySelectorAll('.fbtn').forEach(b=>{const on=b.getAttribute('data-filter')===filter;b.style.background=on?'var(--surface-2)':'';b.style.borderColor=on?'var(--border-strong)':'';});
+
+    const openTasks=items.filter(x=>!x.done&&(x.kind==='todo'||x.kind==='reminder')).length;
+    const overdue=items.filter(isOverdueOrToday).length;
+    const meetings=items.filter(x=>x.kind==='meeting'&&!x.done).length;
+    const docs=items.filter(x=>x.kind==='doc').length;
+    statsEl.innerHTML=[['Open tasks',openTasks],['Due / overdue',overdue],['Meetings',meetings],['Docs / notes',docs]]
+      .map(([l,v],i)=>`<div style="background:var(--surface-1); border-radius:8px; padding:0.75rem 0.85rem;"><div style="font-size:12px; color:var(--text-secondary);">${l}</div><div style="font-size:22px; font-weight:500; color:${i===1&&v>0?'var(--text-warning)':'var(--text-primary)'};">${v}</div></div>`).join('');
+
+    if(shown.length===0){
+      const note=(fPerson||fCustomer||searchQ)?'No items match this filter.':'Nothing here yet. Add your first item above.';
+      listEl.innerHTML=`<div style="text-align:center; padding:2rem 1rem; color:var(--text-muted);"><p style="margin:8px 0 0; font-size:14px;">${note}</p></div>`;
+      return;
+    }
+
+    let html='';
+    const pinned=shown.filter(isOverdueOrToday).sort((a,b)=>(a.due<b.due?-1:1));
+    if(pinned.length && filter!=='doc' && filter!=='meeting'){
+      html+=`<div style="margin-bottom:1.25rem;"><div style="font-size:13px; font-weight:500; color:var(--text-warning); margin-bottom:8px;">Overdue / due today</div>`;
+      pinned.forEach(it=>html+=rowHtml(it));
+      html+=`</div>`;
+    }
+    const pinnedIds=new Set(pinned.map(x=>x.id));
+    const rest=shown.filter(x=>!pinnedIds.has(x.id));
+    const groups={};
+    rest.sort((a,b)=>b.ts-a.ts).forEach(it=>{const k=dayLabel(it.ts);(groups[k]=groups[k]||[]).push(it);});
+    Object.keys(groups).forEach(day=>{
+      const isToday=day===dayLabel(Date.now());
+      html+=`<div style="margin-bottom:1.25rem;"><div style="font-size:13px; font-weight:500; color:${isToday?'var(--text-accent)':'var(--text-secondary)'}; margin-bottom:8px;">${day}${isToday?' · today':''}</div>`;
+      groups[day].forEach(it=>html+=rowHtml(it));
+      html+=`</div>`;
+    });
+    listEl.innerHTML=html;
+    bind();
+  }
+
+  function rowHtml(it){
+    const m=kindMeta[it.kind];
+    const canCheck=(it.kind==='todo'||it.kind==='reminder'||it.kind==='meeting');
+    const high=it.priority==='high'&&!it.done;
+    let h=`<div style="padding:10px 12px; background:var(--surface-2); border:0.5px solid ${high?'var(--border-warning)':'var(--border)'}; border-left:${high?'3px solid var(--border-warning)':'0.5px solid var(--border)'}; border-radius:${high?'0 8px 8px 0':'8px'}; margin-bottom:6px;">`;
+    h+=`<div style="display:flex; align-items:flex-start; gap:10px;">`;
+    if(canCheck) h+=`<button data-toggle="${it.id}" style="flex:0 0 auto; width:20px; height:20px; padding:0; ${it.done?'background:var(--bg-success);':''}">${it.done?'✓':''}</button>`;
+    else h+=`<span style="flex:0 0 auto; width:20px;">•</span>`;
+    h+=`<div style="flex:1; min-width:0;"><div style="font-size:14px; color:var(--text-primary); ${it.done?'text-decoration:line-through; color:var(--text-muted);':''}">${high?'⚑ ':''}${esc(it.text)}</div>`;
+    h+=`<div style="display:flex; align-items:center; gap:8px; margin-top:4px; flex-wrap:wrap;"><span style="font-size:11px; padding:1px 7px; border-radius:8px; background:${m.bg}; color:${m.color};">${m.label}</span>`;
+    if(it.meta) h+=`<span style="font-size:11px; color:var(--text-pro);">${esc(it.meta)}</span>`;
+    if(it.due){ const od=isOverdueOrToday(it); h+=`<span style="font-size:11px; color:${od?'var(--text-warning)':'var(--text-secondary)'};">due ${dayjs(it.due).format('MMM D')}</span>`; }
+    if(it.customer) h+=`<span data-fc="${esc(it.customer)}" style="font-size:11px; padding:1px 7px; border-radius:8px; background:var(--bg-success); color:var(--text-success); cursor:pointer;">${esc(it.customer)}</span>`;
+    (it.people||[]).forEach(p=>h+=`<span data-fp="${esc(p)}" style="font-size:11px; padding:1px 7px; border-radius:8px; background:var(--surface-1); color:var(--text-secondary); cursor:pointer;">${esc(p)}</span>`);
+    if(it.kind==='doc'&&it.body) h+=`<button data-expand="${it.id}" style="font-size:11px; padding:1px 8px; border:none; background:none; color:var(--text-accent); cursor:pointer;">${it._open?'Hide':'Read'}</button>`;
+    h+=`</div></div><button data-del="${it.id}" style="flex:0 0 auto; width:24px; height:24px; padding:0; border:none; background:none; color:var(--text-muted);">×</button></div>`;
+    if(it.kind==='doc'&&it.body&&it._open) h+=`<div style="margin-top:8px; padding:10px 12px; background:var(--surface-1); border-radius:8px; font-size:13px; line-height:1.6; white-space:pre-wrap;">${esc(it.body)}</div>`;
+    h+=`</div>`;
+    return h;
+  }
+
+  function bind(){
+    listEl.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggle(b.getAttribute('data-toggle')));
+    listEl.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>del(b.getAttribute('data-del')));
+    listEl.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>expand(b.getAttribute('data-expand')));
+    listEl.querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>{fPerson=b.getAttribute('data-fp');fCustomer='';rebuildLinks();render();});
+    listEl.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{fCustomer=b.getAttribute('data-fc');fPerson='';rebuildLinks();render();});
+  }
+
+  // ===== BRIEFING =====
+  function dayPayload(){
+    const meetings=items.filter(x=>x.kind==='meeting'&&!x.done);
+    const due=items.filter(isOverdueOrToday);
+    const openTasks=items.filter(x=>!x.done&&(x.kind==='todo'||x.kind==='reminder')&&!isOverdueOrToday(x));
+    const notes=items.filter(x=>x.kind==='doc');
+    const fmt=it=>`- ${it.text}${it.priority==='high'?' [HIGH]':''}${it.customer?' · customer: '+it.customer:''}${(it.people||[]).length?' · '+it.people.join(', '):''}${it.meta?' · '+it.meta:''}${it.due?' · due '+it.due:''}`;
+    let p='Here is my workday board. Write me a tight morning briefing: lead with anything overdue or due today and high-priority items, then meetings in time order, then a short digest of the notes. Flag what deserves attention.\n\n';
+    p+='OVERDUE / DUE TODAY:\n'+(due.length?due.map(fmt).join('\n'):'(none)')+'\n\n';
+    p+='MEETINGS:\n'+(meetings.length?meetings.map(fmt).join('\n'):'(none)')+'\n\n';
+    p+='OTHER OPEN TASKS:\n'+(openTasks.length?openTasks.map(fmt).join('\n'):'(none)')+'\n\n';
+    p+='NOTES / DOCS:\n'+(notes.length?notes.map(it=>`- ${it.text}: ${(it.body||'').slice(0,500)}`).join('\n'):'(none)');
+    return p;
+  }
+
+  async function generateBriefing(){
+    if(items.length===0){ briefOut.style.display='block'; briefOut.innerHTML='<p style="margin:0; font-size:14px;">Add some items first.</p>'; return; }
+    briefOut.style.display='block';
+    briefOut.innerHTML='<div style="font-size:14px; color:var(--text-secondary);">Writing your briefing…</div>';
+    try{
+      const headers = { 'content-type': 'application/json' };
+      if (USE_SUPABASE && session) {
+        headers['authorization'] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/morning-briefing`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ prompt: dayPayload() }),
+      });
+      const data = await res.json();
+      const text = data.text || '';
+      briefOut.innerHTML=`<div style="font-size:13px; font-weight:500; color:var(--text-accent); margin-bottom:8px;">Today's briefing</div><div style="font-size:14px; line-height:1.65; white-space:pre-wrap;">${esc(text)}</div>`;
+    }catch(e){
+      briefOut.innerHTML='<div style="font-size:14px; color:var(--text-secondary);">Briefing service unavailable. Make sure SUPABASE_URL is configured and the Edge Function is deployed.</div>';
+    }
+  }
+
+  function printBriefing(){
+    let w=window.open('','_blank');
+    let body=`<h1>AG Daily Briefing — ${dayLabel(Date.now())}</h1>`;
+    const sec=(title,arr)=>arr.length?`<h2>${title}</h2><ul>${arr.map(it=>`<li>${esc(it.text)}${it.priority==='high'?' (high)':''}${it.due?' — due '+it.due:''}${it.customer?' — '+esc(it.customer):''}${it.meta?' — '+esc(it.meta):''}</li>`).join('')}</ul>`:'';
+    body+=sec('Overdue / due today',items.filter(isOverdueOrToday));
+    body+=sec('Meetings',items.filter(x=>x.kind==='meeting'&&!x.done));
+    body+=sec('Open tasks',items.filter(x=>!x.done&&(x.kind==='todo'||x.kind==='reminder')&&!isOverdueOrToday(x)));
+    body+=sec('Notes',items.filter(x=>x.kind==='doc'));
+    w.document.write(`<html><head><title>AG Daily Briefing</title><style>body{font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;}h2{font-size:15px;margin-top:24px;border-bottom:1px solid #ccc;padding-bottom:4px;}li{margin:4px 0;line-height:1.5;}</style></head><body>${body}</body></html>`);
+    w.document.close(); w.print();
+  }
+
+  function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+  $('add').onclick=addItem;
+  entryEl.addEventListener('keydown',e=>{if(e.key==='Enter'&&kindEl.value!=='doc')addItem();});
+  document.querySelectorAll('.fbtn').forEach(b=>b.onclick=()=>{filter=b.getAttribute('data-filter');render();});
+  fPersonEl.onchange=()=>{fPerson=fPersonEl.value;render();rebuildLinks();};
+  fCustomerEl.onchange=()=>{fCustomer=fCustomerEl.value;render();rebuildLinks();};
+  clearLinksEl.onclick=()=>{fPerson='';fCustomer='';rebuildLinks();render();};
+  searchEl.addEventListener('input',()=>{searchQ=searchEl.value.trim();render();});
+  $('btn-brief').onclick=generateBriefing;
+  $('btn-print').onclick=printBriefing;
+
+  syncFields();
+  initAuth();
+})();
+</script>
+</body>
+</html>
