@@ -363,6 +363,113 @@
     .empty-state p { margin: 0; font-size: 14px; }
     .empty-state .empty-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
 
+    .view-toggle {
+      display: flex;
+      background: var(--surface-2);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .view-toggle button {
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .view-toggle button.active {
+      background: var(--surface-1);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .cal-header {
+      background: var(--surface-2);
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .cal-day {
+      background: var(--surface-1);
+      min-height: 90px;
+      padding: 4px;
+      vertical-align: top;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .cal-day:hover { background: var(--surface-2); }
+    .cal-day.other-month { opacity: 0.4; }
+    .cal-day.today { background: var(--bg-accent); }
+    .cal-day .day-num {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding: 2px 4px;
+      display: inline-block;
+    }
+    .cal-day.today .day-num {
+      background: var(--text-accent);
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      text-align: center;
+      line-height: 20px;
+    }
+    .cal-item {
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .cal-nav h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .cal-nav button {
+      border: 1px solid var(--border);
+      background: var(--surface-1);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .repeat-badge {
+      font-size: 10px;
+      color: var(--text-accent);
+      font-weight: 500;
+    }
+
     @media (max-width: 600px) {
       .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
     }
@@ -372,7 +479,7 @@
       #search, #fperson, #fcustomer, #typefilters, .add-section,
       button[data-del], button[data-toggle], button[data-expand], button[data-edit],
       .edit-overlay, .drag-handle, .completed-toggle, .undo-toast,
-      .item-actions, .header-bar { display: none !important; }
+      .item-actions, .header-bar, .view-toggle, #calendar-view { display: none !important; }
       body { background: white; color: black; }
       .item-row { box-shadow: none; border: 1px solid #ddd; }
     }
@@ -444,14 +551,28 @@
       </div>
       <input id="mtime" type="text" placeholder="Meeting time / location" style="width:100%; margin-bottom:8px; display:none; box-sizing:border-box;" />
       <textarea id="docbody" placeholder="Notes (optional)…" style="width:100%; min-height:60px; margin-bottom:8px; box-sizing:border-box;"></textarea>
-      <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <label id="repeat-wrap" style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); cursor:pointer;">
+          <input id="repeat" type="checkbox" style="width:auto; padding:0; margin:0;" /> Repeats weekly
+        </label>
         <button id="add" class="btn-primary">Add item</button>
       </div>
     </div>
 
-    <div id="stats" class="stat-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.75rem;"></div>
-    <div id="list"></div>
-    <div id="completed-section"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div id="stats" class="stat-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; flex:1;"></div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+      <div class="view-toggle">
+        <button id="view-list" class="active">List</button>
+        <button id="view-calendar">Calendar</button>
+      </div>
+    </div>
+    <div id="list-view">
+      <div id="list"></div>
+      <div id="completed-section"></div>
+    </div>
+    <div id="calendar-view" style="display:none;"></div>
   </div>
 </div>
 
@@ -540,13 +661,16 @@
   let showCompleted = false;
   let undoTimer = null, undoItem = null;
   let dragId = null;
+  let currentView = 'list';
+  let calMonth = dayjs().month(), calYear = dayjs().year();
 
   const $ = id => document.getElementById(id);
   const listEl=$('list'),statsEl=$('stats'),entryEl=$('entry'),kindEl=$('kind'),mtimeEl=$('mtime'),
     docbodyEl=$('docbody'),peopleEl=$('people'),customerEl=$('customer'),dueEl=$('due'),prioEl=$('priority'),
     fPersonEl=$('fperson'),fCustomerEl=$('fcustomer'),clearLinksEl=$('clearlinks'),searchEl=$('search'),
     custlist=$('custlist'),editModal=$('edit-modal'),completedSection=$('completed-section'),
-    undoContainer=$('undo-container');
+    undoContainer=$('undo-container'),repeatEl=$('repeat'),
+    listView=$('list-view'),calendarView=$('calendar-view');
 
   const kindMeta={
     todo:{label:'To-do',color:'var(--text-accent)',bg:'var(--bg-accent)'},
@@ -611,19 +735,40 @@
       const { data, error } = await supabase.from('items').select('*').order('created_at', { ascending: false });
       if (error) { console.error('load error:', error); items = []; }
       else {
-        items = (data || []).map(row => ({
-          id: row.id, text: row.text, kind: row.kind, done: row.done,
-          ts: new Date(row.created_at).getTime(), people: row.people || [],
-          customer: row.customer || '', priority: row.priority,
-          due: row.due || '', meta: row.meta || '', body: row.body || '',
-          sortOrder: row.sort_order || 0
-        }));
+        items = (data || []).map(row => {
+          const dm = decodeMeta(row.meta);
+          return {
+            id: row.id, text: row.text, kind: row.kind, done: row.done,
+            ts: new Date(row.created_at).getTime(), people: row.people || [],
+            customer: row.customer || '', priority: row.priority,
+            due: row.due || '', meta: dm.meta, body: row.body || '',
+            repeat: dm.repeat, sortOrder: row.sort_order || 0
+          };
+        });
       }
     } else {
       try { items = JSON.parse(localStorage.getItem(LSKEY) || '[]'); } catch(e) { items = []; }
       items.forEach((it,i) => { if(!it.sortOrder) it.sortOrder = i; });
     }
+    advanceRecurring();
     rebuildLinks(); render();
+  }
+
+  function advanceRecurring(){
+    const today=dayjs(todayISO());
+    items.forEach(it=>{
+      if(it.repeat==='weekly' && it.due && !it.done){
+        let d=dayjs(it.due);
+        while(d.isBefore(today)){
+          d=d.add(7,'day');
+        }
+        const newDue=d.format('YYYY-MM-DD');
+        if(newDue!==it.due){
+          it.due=newDue;
+          saveItem(it);
+        }
+      }
+    });
   }
 
   async function save(){
@@ -636,11 +781,22 @@
     }
   }
 
+  function encodeMeta(it){
+    let m = it.meta || '';
+    if(it.repeat) m = (m ? m+' [weekly]' : '[weekly]');
+    return m;
+  }
+  function decodeMeta(metaStr){
+    const hasRepeat = (metaStr||'').includes('[weekly]');
+    const clean = (metaStr||'').replace(/\s*\[weekly\]/g,'').trim();
+    return { meta: clean, repeat: hasRepeat ? 'weekly' : '' };
+  }
+
   async function saveItem(it) {
     if (USE_SUPABASE) {
       const row = {
         id: it.id, kind: it.kind, text: it.text, body: it.body || null,
-        meta: it.meta || null, people: it.people || [], customer: it.customer || null,
+        meta: encodeMeta(it) || null, people: it.people || [], customer: it.customer || null,
         priority: it.priority, due: it.due || null, done: it.done
       };
       const { error } = await supabase.from('items').upsert(row);
@@ -666,13 +822,24 @@
       due:(k==='todo'||k==='reminder'||k==='meeting')?dueEl.value:'',
       meta:k==='meeting'?mtimeEl.value.trim():'',
       body:docbodyEl.value.trim(),
+      repeat:repeatEl.checked?'weekly':'',
       sortOrder:maxOrder+1};
     items.push(it);
-    entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';prioEl.value='normal';
+    entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';prioEl.value='normal';repeatEl.checked=false;
     saveItem(it); rebuildLinks(); render();
   }
 
-  function toggle(id){const it=items.find(x=>x.id===id);if(it){it.done=!it.done;saveItem(it);render();}}
+  function toggle(id){
+    const it=items.find(x=>x.id===id);
+    if(!it) return;
+    if(it.repeat==='weekly' && !it.done && it.due){
+      it.due=dayjs(it.due).add(7,'day').format('YYYY-MM-DD');
+      saveItem(it); render();
+    } else {
+      it.done=!it.done;
+      saveItem(it); render();
+    }
+  }
 
   function confirmDel(id){
     const it=items.find(x=>x.id===id);
@@ -738,6 +905,9 @@
       </select>
       <label>Due date</label>
       <input id="ed-due" type="date" value="${esc(it.due)}" />
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
+        <input id="ed-repeat" type="checkbox" style="width:auto;padding:0;margin:0;" ${it.repeat==='weekly'?'checked':''} /> Repeats weekly
+      </label>
       <label>People (comma-separated)</label>
       <input id="ed-people" type="text" value="${esc((it.people||[]).join(', '))}" />
       <label>Customer</label>
@@ -759,6 +929,7 @@
       it.kind=document.getElementById('ed-kind').value;
       it.priority=document.getElementById('ed-priority').value;
       it.due=document.getElementById('ed-due').value;
+      it.repeat=document.getElementById('ed-repeat').checked?'weekly':'';
       it.people=parsePeople(document.getElementById('ed-people').value);
       it.customer=document.getElementById('ed-customer').value.trim();
       it.meta=document.getElementById('ed-meta').value.trim();
@@ -861,6 +1032,7 @@
     }
 
     bind();
+    if(currentView==='calendar') renderCalendar();
   }
 
   function rowHtml(it){
@@ -889,6 +1061,7 @@
     }
     if(it.customer) h+=`<span data-fc="${esc(it.customer)}" class="tag" style="background:var(--bg-success); color:var(--text-success); cursor:pointer;">${esc(it.customer)}</span>`;
     (it.people||[]).forEach(p=>h+=`<span data-fp="${esc(p)}" class="tag" style="background:var(--surface-2); color:var(--text-secondary); cursor:pointer;">${esc(p)}</span>`);
+    if(it.repeat==='weekly') h+=`<span class="repeat-badge">↻ Weekly</span>`;
     if(it.body) h+=`<button data-expand="${it.id}" class="btn-ghost" style="font-size:11px; padding:1px 6px; color:var(--text-accent);">${it._open?'Hide notes':'Notes'}</button>`;
     h+=`</div></div>`;
     h+=`<div class="item-actions">`;
@@ -1139,6 +1312,111 @@
     }
   }
 
+  function renderCalendar(){
+    const first=dayjs().year(calYear).month(calMonth).date(1);
+    const startDay=first.day();
+    const daysInMonth=first.daysInMonth();
+    const prevMonth=first.subtract(1,'month');
+    const prevDays=prevMonth.daysInMonth();
+    const todayStr=todayISO();
+
+    const itemsByDate={};
+    items.forEach(it=>{
+      if(!it.due) return;
+      let dates=[it.due];
+      if(it.repeat==='weekly' && !it.done){
+        let d=dayjs(it.due);
+        const end=first.add(42,'day');
+        while(d.isBefore(end)){
+          dates.push(d.format('YYYY-MM-DD'));
+          d=d.add(7,'day');
+        }
+      }
+      dates.forEach(dt=>{
+        (itemsByDate[dt]=itemsByDate[dt]||[]).push(it);
+      });
+    });
+
+    const monthLabel=first.format('MMMM YYYY');
+    let html=`<div class="cal-nav">
+      <button id="cal-prev">◀</button>
+      <h3>${monthLabel}</h3>
+      <button id="cal-next">▶</button>
+    </div>`;
+    html+=`<div class="calendar-grid">`;
+    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>{
+      html+=`<div class="cal-header">${d}</div>`;
+    });
+
+    let dayNum=1, nextDayNum=1;
+    const totalCells=Math.ceil((startDay+daysInMonth)/7)*7;
+    for(let i=0;i<totalCells;i++){
+      let dateStr='', num='', cls='cal-day';
+      if(i<startDay){
+        num=prevDays-startDay+i+1;
+        const d=prevMonth.date(num);
+        dateStr=d.format('YYYY-MM-DD');
+        cls+=' other-month';
+      } else if(dayNum<=daysInMonth){
+        num=dayNum;
+        dateStr=first.date(dayNum).format('YYYY-MM-DD');
+        if(dateStr===todayStr) cls+=' today';
+        dayNum++;
+      } else {
+        const d=first.add(1,'month').date(nextDayNum);
+        dateStr=d.format('YYYY-MM-DD');
+        num=nextDayNum++;
+        cls+=' other-month';
+      }
+
+      html+=`<div class="${cls}" data-cal-date="${dateStr}">`;
+      html+=`<div class="day-num">${num}</div>`;
+      const dayItems=itemsByDate[dateStr]||[];
+      const shown=dayItems.slice(0,3);
+      const typeColors={todo:'#2563eb',reminder:'#c2410c',meeting:'#7c3aed',doc:'#888'};
+      const typeBg={todo:'#eff6ff',reminder:'#fff7ed',meeting:'#f5f3ff',doc:'#f5f5f5'};
+      shown.forEach(it=>{
+        const bg=typeBg[it.kind]||'#f5f5f5';
+        const color=typeColors[it.kind]||'#888';
+        html+=`<div class="cal-item" style="background:${bg};color:${color};" data-edit="${it.id}" title="${esc(it.text)}">${it.priority==='high'?'⚑ ':''}${esc(it.text)}</div>`;
+      });
+      if(dayItems.length>3) html+=`<div style="font-size:10px;color:var(--text-muted);padding:1px 4px;">+${dayItems.length-3} more</div>`;
+      html+=`</div>`;
+    }
+    html+=`</div>`;
+    calendarView.innerHTML=html;
+
+    $('cal-prev').onclick=()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();};
+    $('cal-next').onclick=()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();};
+    calendarView.querySelectorAll('[data-edit]').forEach(el=>{
+      el.onclick=(e)=>{e.stopPropagation();openEdit(el.getAttribute('data-edit'));};
+    });
+    calendarView.querySelectorAll('[data-cal-date]').forEach(el=>{
+      el.onclick=()=>{
+        const d=el.getAttribute('data-cal-date');
+        dueEl.value=d;
+        currentView='list';
+        switchView();
+        entryEl.focus();
+      };
+    });
+  }
+
+  function switchView(){
+    if(currentView==='list'){
+      listView.style.display='';
+      calendarView.style.display='none';
+      $('view-list').classList.add('active');
+      $('view-calendar').classList.remove('active');
+    } else {
+      listView.style.display='none';
+      calendarView.style.display='';
+      $('view-list').classList.remove('active');
+      $('view-calendar').classList.add('active');
+      renderCalendar();
+    }
+  }
+
   function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
   $('add').onclick=addItem;
@@ -1150,6 +1428,8 @@
   searchEl.addEventListener('input',()=>{searchQ=searchEl.value.trim();render();});
   $('btn-print').onclick=printBriefing;
   $('btn-email').onclick=emailBriefing;
+  $('view-list').onclick=()=>{currentView='list';switchView();};
+  $('view-calendar').onclick=()=>{currentView='calendar';switchView();};
 
   syncFields();
   initAuth();
