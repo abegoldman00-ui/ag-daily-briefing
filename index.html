@@ -8,6 +8,8 @@
   <script src="config.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
   <style>
     :root {
       --surface-0: #f5f6f8;
@@ -1072,29 +1074,69 @@
     w.document.close(); w.print();
   }
 
-  async function emailBriefing(){
-    const subject='AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
+  async function generatePdf(){
     const html=briefingFullHtml();
-    const file=new File([html],subject.replace(/[^a-zA-Z0-9 —-]/g,'')+'.html',{type:'text/html'});
-
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      try {
-        await navigator.share({title:subject,files:[file]});
-        return;
-      } catch(e){ if(e.name==='AbortError') return; }
+    const iframe=document.createElement('iframe');
+    iframe.style.cssText='position:fixed;left:-9999px;top:0;width:800px;height:auto;border:none;';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    await new Promise(r=>iframe.onload=r);
+    await new Promise(r=>setTimeout(r,300));
+    const el=iframe.contentDocument.body;
+    const canvas=await html2canvas(el,{scale:2,useCORS:true,width:760,windowWidth:800});
+    document.body.removeChild(iframe);
+    const {jsPDF}=window.jspdf;
+    const pageW=210, margin=10, contentW=pageW-margin*2;
+    const imgW=contentW, imgH=(canvas.height*contentW)/canvas.width;
+    const pageH=297, usableH=pageH-margin*2;
+    const pdf=new jsPDF('p','mm','a4');
+    let y=0, page=0;
+    while(y<imgH){
+      if(page>0) pdf.addPage();
+      const srcY=(y/imgH)*canvas.height;
+      const srcH=Math.min((usableH/imgH)*canvas.height, canvas.height-srcY);
+      const sliceCanvas=document.createElement('canvas');
+      sliceCanvas.width=canvas.width;
+      sliceCanvas.height=srcH;
+      sliceCanvas.getContext('2d').drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,srcH);
+      const sliceImg=sliceCanvas.toDataURL('image/png');
+      const sliceH=(srcH*contentW)/canvas.width;
+      pdf.addImage(sliceImg,'PNG',margin,margin,imgW,sliceH);
+      y+=usableH;
+      page++;
     }
+    return pdf;
+  }
 
-    const blob=new Blob([html],{type:'text/html'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=subject.replace(/[^a-zA-Z0-9 —-]/g,'')+'.html';
-    a.click();
-    URL.revokeObjectURL(url);
+  async function emailBriefing(){
+    const btn=$('btn-email');
+    const origText=btn.textContent;
+    btn.textContent='Generating PDF...';
+    btn.disabled=true;
+    try {
+      const pdf=await generatePdf();
+      const subject='AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
+      const filename=subject.replace(/[^a-zA-Z0-9 —-]/g,'')+'.pdf';
+      const blob=pdf.output('blob');
+      const file=new File([blob],filename,{type:'application/pdf'});
 
-    setTimeout(()=>{
-      window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent('Your AG Daily Briefing is attached. Open the downloaded .html file and print to PDF, or attach it to this email.');
-    },500);
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        try {
+          await navigator.share({title:subject,files:[file]});
+          return;
+        } catch(e){ if(e.name==='AbortError') return; }
+      }
+
+      pdf.save(filename);
+      setTimeout(()=>{
+        window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent('AG Daily Briefing PDF is downloaded — attach it to this email.');
+      },500);
+    } finally {
+      btn.textContent=origText;
+      btn.disabled=false;
+    }
   }
 
   function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
