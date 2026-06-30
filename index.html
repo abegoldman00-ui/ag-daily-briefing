@@ -1347,7 +1347,8 @@
       shown.forEach(it=>{
         const bg=typeBg[it.kind]||'#f5f5f5';
         const color=typeColors[it.kind]||'#888';
-        html+=`<div class="cal-item" style="background:${bg};color:${color};" data-edit="${it.id}" title="${esc(it.text)}">${it.priority==='high'?'⚑ ':''}${esc(it.text)}</div>`;
+        const doneStyle=it.done?'text-decoration:line-through; opacity:0.55;':'';
+        html+=`<div class="cal-item" style="background:${bg};color:${color};${doneStyle}" data-edit="${it.id}" title="${esc(it.text)}">${it.priority==='high'?'⚑ ':''}${esc(it.text)}</div>`;
       });
       if(dayItems.length>3) html+=`<div style="font-size:10px;color:var(--text-muted);padding:1px 4px;">+${dayItems.length-3} more</div>`;
       html+=`</div>`;
@@ -1377,7 +1378,8 @@
           dayItems.forEach(it=>{
             const color=typeColors[it.kind]||'#888';
             const icon=typeIcons[it.kind]||'';
-            h+=`<div class="day-preview-item" data-edit="${it.id}" style="padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--surface-2);cursor:pointer;border-left:3px solid ${color};">
+            const doneStyle=it.done?'text-decoration:line-through; opacity:0.55;':'';
+            h+=`<div class="day-preview-item" data-edit="${it.id}" style="padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--surface-2);cursor:pointer;border-left:3px solid ${color};${doneStyle}">
               <div style="font-size:14px;font-weight:500;color:var(--text-primary);">${icon} ${it.priority==='high'?'<span style="color:#dc2626;">⚑</span> ':''}${esc(it.text)}</div>
               ${it.people&&it.people.length?`<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">👤 ${it.people.join(', ')}</div>`:''}
               ${it.customer?`<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">🏢 ${it.customer}</div>`:''}
