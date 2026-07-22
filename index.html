@@ -1289,22 +1289,19 @@
 
     Object.keys(groups).forEach(dayLabel=>{
       const arr=groups[dayLabel];
-      text+='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-      text+=dayLabel.toUpperCase()+' ('+arr.length+')\n';
-      text+='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+      text+=dayLabel.toUpperCase()+'\n';
       arr.forEach(it=>{
         const high=it.priority==='high';
-        let line='  '+(high?'[!] ':'    ')+'['+typeLabels[it.kind]+'] '+it.text;
-        if(it.customer) line+='\n        Customer: '+it.customer;
-        if(it.people&&it.people.length) line+='\n        People: '+it.people.join(', ');
-        if(it.meta) line+='\n        '+it.meta;
-        if(it.repeat==='weekly') line+='\n        Repeats weekly';
-        if(it.body) line+='\n        Note: '+it.body.slice(0,100)+(it.body.length>100?'...':'');
-        text+=line+'\n\n';
+        let line='• '+(high?'(!) ':'')+it.text;
+        const extras=[];
+        if(it.meta) extras.push(it.meta);
+        if(it.customer) extras.push(it.customer);
+        if(it.people&&it.people.length) extras.push(it.people.join(', '));
+        if(extras.length) line+=' — '+extras.join(' · ');
+        text+=line+'\n';
       });
+      text+='\n';
     });
-
-    text+='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nGenerated '+dayjs().format('MMM D, YYYY [at] h:mm A')+'\n';
 
     const subject='AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
     window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
