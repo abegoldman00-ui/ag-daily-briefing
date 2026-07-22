@@ -1181,7 +1181,8 @@
     });
   }
 
-  function briefingDateGroups(){
+  function briefingDateGroups(refDate){
+    const ref=refDate?dayjs(refDate):dayjs(todayISO());
     const typeLabels={todo:'To-do',reminder:'Reminder',meeting:'Meeting',doc:'Doc'};
     const allOpen=items.filter(x=>!x.done).sort((a,b)=>{
       if(a.due&&b.due) return a.due<b.due?-1:a.due>b.due?1:0;
@@ -1193,7 +1194,7 @@
     allOpen.forEach(it=>{
       let label='No date';
       if(it.due){
-        const d=dayjs(it.due),td=dayjs(todayISO()),diff=d.diff(td,'day');
+        const d=dayjs(it.due),diff=d.diff(ref,'day');
         if(diff<0) label='Overdue';
         else if(diff===0) label='Today — '+d.format('ddd, MMM D');
         else if(diff===1) label='Tomorrow — '+d.format('ddd, MMM D');
@@ -1283,9 +1284,9 @@
   }
 
   function emailBriefing(){
-    const {groups, typeLabels} = briefingDateGroups();
-    const today=dayjs().format('dddd, MMMM D, YYYY');
-    let text='AG DAILY BRIEFING\n'+today+'\n\n';
+    const nextDay=dayjs(todayISO()).add(1,'day');
+    const {groups, typeLabels} = briefingDateGroups(nextDay);
+    let text='AG DAILY BRIEFING\n'+nextDay.format('dddd, MMMM D, YYYY')+'\n\n';
 
     Object.keys(groups).forEach(dayLabel=>{
       const arr=groups[dayLabel];
@@ -1303,7 +1304,7 @@
       text+='\n';
     });
 
-    const subject='AG Daily Briefing — '+dayjs().format('MMM D, YYYY');
+    const subject='AG Daily Briefing — '+nextDay.format('MMM D, YYYY');
     window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
   }
 
