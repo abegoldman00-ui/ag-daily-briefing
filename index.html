@@ -1288,6 +1288,25 @@
     const {groups, typeLabels} = briefingDateGroups(nextDay);
     let text='AG DAILY BRIEFING\n'+nextDay.format('dddd, MMMM D, YYYY')+'\n\n';
 
+    // Week-ahead summary: next 7 days from the briefing date
+    const weekEnd=nextDay.add(7,'day');
+    const open=items.filter(x=>!x.done);
+    const inWeek=open.filter(it=>it.due&&!dayjs(it.due).isBefore(nextDay,'day')&&dayjs(it.due).isBefore(weekEnd,'day'));
+    const meetings=inWeek.filter(it=>it.kind==='meeting').length;
+    const dueCount=inWeek.filter(it=>it.kind!=='meeting').length;
+    const overdue=open.filter(it=>it.due&&dayjs(it.due).isBefore(nextDay,'day')).length;
+    const highPrio=inWeek.filter(it=>it.priority==='high').length;
+    const custs=[...new Set(inWeek.map(it=>it.customer).filter(Boolean))];
+    text+='THE WEEK AHEAD\n';
+    const parts=[];
+    parts.push(meetings+(meetings===1?' meeting':' meetings'));
+    parts.push(dueCount+(dueCount===1?' item due':' items due'));
+    if(highPrio) parts.push(highPrio+' high priority');
+    if(overdue) parts.push(overdue+' overdue');
+    text+='• '+parts.join(' · ')+'\n';
+    if(custs.length) text+='• Customers: '+custs.join(', ')+'\n';
+    text+='\n';
+
     Object.keys(groups).forEach(dayLabel=>{
       const arr=groups[dayLabel];
       text+=dayLabel.toUpperCase()+'\n';
