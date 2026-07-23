@@ -588,7 +588,7 @@
           <option value="meeting">Meeting</option>
           <option value="doc">Doc / note</option>
         </select>
-        <input id="entry" type="text" placeholder="Add an item…" style="flex:1; min-width:150px;" />
+        <input id="entry" type="text" placeholder="Add an item… (try: Call John tomorrow 10am @John #Acme)" style="flex:1; min-width:150px;" />
         <select id="priority" style="width:120px;">
           <option value="normal">Normal</option>
           <option value="high">High priority</option>
@@ -599,6 +599,7 @@
         <input id="customer" type="text" placeholder="Customer" list="custlist" style="flex:1; min-width:140px;" />
         <datalist id="custlist"></datalist>
         <input id="due" type="date" style="width:150px;" title="Due date" />
+        <input id="itime" type="time" style="width:110px;" title="Time (optional)" />
       </div>
       <input id="mtime" type="text" placeholder="Meeting time / location" style="width:100%; margin-bottom:8px; display:none; box-sizing:border-box;" />
       <textarea id="docbody" placeholder="Notes (optional)…" style="width:100%; min-height:60px; margin-bottom:8px; box-sizing:border-box;"></textarea>
@@ -800,7 +801,7 @@
             ts: new Date(row.created_at).getTime(), people: row.people || [],
             customer: row.customer || '', priority: row.priority,
             due: row.due || '', meta: dm.meta, body: row.body || '',
-            repeat: dm.repeat, sortOrder: row.sort_order || 0
+            repeat: dm.repeat, time: dm.time, sortOrder: row.sort_order || 0
           };
         });
       }
@@ -842,12 +843,21 @@
   function encodeMeta(it){
     let m = it.meta || '';
     if(it.repeat) m = (m ? m+' [weekly]' : '[weekly]');
+    if(it.time) m = (m ? m+' ' : '')+'[t:'+it.time+']';
     return m;
   }
   function decodeMeta(metaStr){
     const hasRepeat = (metaStr||'').includes('[weekly]');
-    const clean = (metaStr||'').replace(/\s*\[weekly\]/g,'').trim();
-    return { meta: clean, repeat: hasRepeat ? 'weekly' : '' };
+    const tm = (metaStr||'').match(/\[t:(\d{2}:\d{2})\]/);
+    const clean = (metaStr||'').replace(/\s*\[weekly\]/g,'').replace(/\s*\[t:\d{2}:\d{2}\]/g,'').trim();
+    return { meta: clean, repeat: hasRepeat ? 'weekly' : '', time: tm ? tm[1] : '' };
+  }
+  function fmtTime(t){
+    if(!t) return '';
+    const [h,m]=t.split(':').map(Number);
+    const ap=h>=12?'pm':'am';
+    const h12=h%12||12;
+    return h12+(m?':'+String(m).padStart(2,'0'):'')+ap;
   }
 
   async function saveItem(it) {
@@ -869,21 +879,68 @@
     } else { save(); }
   }
 
+  // Parse natural-language tokens out of the quick-add text:
+  // "tomorrow", "today", weekday names, times like "10am"/"3:30pm",
+  // "@Person" and "#Customer". Only fills fields the user left blank.
+  function smartParse(text){
+    const out={text, due:'', time:'', people:[], customer:''};
+    const today=dayjs(todayISO());
+    let t=' '+text+' ';
+
+    const tm=t.match(/\s(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s/i);
+    if(tm){
+      let h=parseInt(tm[1],10)%12;
+      if(tm[3].toLowerCase()==='pm') h+=12;
+      out.time=String(h).padStart(2,'0')+':'+(tm[2]||'00');
+      t=t.replace(tm[0],' ');
+    }
+
+    if(/\stomorrow\s/i.test(t)){ out.due=today.add(1,'day').format('YYYY-MM-DD'); t=t.replace(/\stomorrow\s/i,' '); }
+    else if(/\s(today|tonight)\s/i.test(t)){ out.due=today.format('YYYY-MM-DD'); t=t.replace(/\s(today|tonight)\s/i,' '); }
+    else if(/\snext week\s/i.test(t)){ out.due=today.add(7,'day').format('YYYY-MM-DD'); t=t.replace(/\snext week\s/i,' '); }
+    else {
+      const days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+      for(let i=0;i<7;i++){
+        const re=new RegExp('\\s(on\\s+)?'+days[i]+'\\s','i');
+        if(re.test(t)){
+          let d=today.day(i);
+          if(!d.isAfter(today,'day')) d=d.add(7,'day');
+          out.due=d.format('YYYY-MM-DD');
+          t=t.replace(re,' ');
+          break;
+        }
+      }
+    }
+
+    let m2;
+    while((m2=t.match(/\s@([A-Za-z][\w.-]*)/))){ out.people.push(m2[1]); t=t.replace(m2[0],' '); }
+    const cm=t.match(/\s#([\w][\w &.-]*?)(?=\s{2}|\s$|\s[@#])/) || t.match(/\s#(\S+)/);
+    if(cm){ out.customer=cm[1].trim(); t=t.replace(cm[0],' '); }
+
+    out.text=t.replace(/\s+/g,' ').trim();
+    return out;
+  }
+
   function addItem(){
-    const text=entryEl.value.trim(),k=kindEl.value;
-    if(!text) return;
+    const raw=entryEl.value.trim(),k=kindEl.value;
+    if(!raw) return;
+    const parsed=smartParse(raw);
+    const text=parsed.text||raw;
     const id = USE_SUPABASE ? crypto.randomUUID() : 'i'+Date.now();
     const maxOrder = items.reduce((m,it) => Math.max(m, it.sortOrder||0), 0);
+    const canDue=(k==='todo'||k==='reminder'||k==='meeting');
     const it={id,text,kind:k,done:false,ts:Date.now(),
-      people:parsePeople(peopleEl.value),customer:customerEl.value.trim(),
+      people:parsePeople(peopleEl.value).concat(parsed.people),
+      customer:customerEl.value.trim()||parsed.customer,
       priority:prioEl.value,
-      due:(k==='todo'||k==='reminder'||k==='meeting')?dueEl.value:'',
+      due:canDue?(dueEl.value||parsed.due):'',
+      time:canDue?($('itime').value||parsed.time):'',
       meta:k==='meeting'?mtimeEl.value.trim():'',
       body:docbodyEl.value.trim(),
       repeat:repeatEl.checked?'weekly':'',
       sortOrder:maxOrder+1};
     items.push(it);
-    entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';prioEl.value='normal';repeatEl.checked=false;
+    entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';$('itime').value='';prioEl.value='normal';repeatEl.checked=false;
     saveItem(it); rebuildLinks(); render();
   }
 
@@ -963,6 +1020,8 @@
       </select>
       <label>Due date</label>
       <input id="ed-due" type="date" value="${esc(it.due)}" />
+      <label>Time</label>
+      <input id="ed-time" type="time" value="${esc(it.time||'')}" />
       <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
         <input id="ed-repeat" type="checkbox" style="width:auto;padding:0;margin:0;" ${it.repeat==='weekly'?'checked':''} /> Repeats weekly
       </label>
@@ -987,6 +1046,7 @@
       it.kind=document.getElementById('ed-kind').value;
       it.priority=document.getElementById('ed-priority').value;
       it.due=document.getElementById('ed-due').value;
+      it.time=document.getElementById('ed-time').value;
       it.repeat=document.getElementById('ed-repeat').checked?'weekly':'';
       it.people=parsePeople(document.getElementById('ed-people').value);
       it.customer=document.getElementById('ed-customer').value.trim();
@@ -1048,7 +1108,8 @@
       shown.sort((a,b)=>{
         if(a.priority==='high'&&b.priority!=='high') return -1;
         if(b.priority==='high'&&a.priority!=='high') return 1;
-        if(a.due&&b.due) return a.due<b.due?-1:a.due>b.due?1:0;
+        if(a.due&&b.due&&a.due!==b.due) return a.due<b.due?-1:1;
+        if(a.due&&b.due){ const at=a.time||'99',bt=b.time||'99'; if(at!==bt) return at<bt?-1:1; return 0; }
         if(a.due) return -1;
         if(b.due) return 1;
         const ao=a.sortOrder||0, bo=b.sortOrder||0;
@@ -1115,7 +1176,7 @@
       const od=isOverdueOrToday(it);
       const ds=isDueSoon(it);
       let dueColor=od?'var(--text-warning)':ds?'var(--text-due-soon)':'var(--text-muted)';
-      h+=`<span class="relative-date" style="color:${dueColor}; ${(od||ds)?'font-weight:600;':''}">${friendlyDate(it.due)}</span>`;
+      h+=`<span class="relative-date" style="color:${dueColor}; ${(od||ds)?'font-weight:600;':''}">${friendlyDate(it.due)}${it.time?' '+fmtTime(it.time):''}</span>`;
     }
     if(it.customer) h+=`<span data-fc="${esc(it.customer)}" class="tag" style="background:var(--bg-success); color:var(--text-success); cursor:pointer;">${esc(it.customer)}</span>`;
     (it.people||[]).forEach(p=>h+=`<span data-fp="${esc(p)}" class="tag" style="background:var(--surface-2); color:var(--text-secondary); cursor:pointer;">${esc(p)}</span>`);
@@ -1123,6 +1184,10 @@
     if(it.body) h+=`<button data-expand="${it.id}" class="btn-ghost" style="font-size:11px; padding:1px 6px; color:var(--text-accent);">${it._open?'Hide notes':'Notes'}</button>`;
     h+=`</div></div>`;
     h+=`<div class="item-actions">`;
+    if(!it.done&&canCheck){
+      h+=`<button data-snooze="${it.id}|1" class="btn-icon" title="Push to tomorrow" style="font-size:11px;">+1d</button>`;
+      h+=`<button data-snooze="${it.id}|7" class="btn-icon" title="Push a week" style="font-size:11px;">+1w</button>`;
+    }
     h+=`<button data-edit="${it.id}" class="btn-icon" title="Edit">✎</button>`;
     h+=`<button data-del="${it.id}" class="btn-icon del" title="Delete">×</button>`;
     h+=`</div>`;
@@ -1137,6 +1202,15 @@
     document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDel(b.getAttribute('data-del')));
     document.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>expand(b.getAttribute('data-expand')));
     document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(b.getAttribute('data-edit')));
+    document.querySelectorAll('[data-snooze]').forEach(b=>b.onclick=()=>{
+      const [id,n]=b.getAttribute('data-snooze').split('|');
+      const it=items.find(x=>x.id===id);
+      if(!it) return;
+      const today=todayISO();
+      const base=(it.due&&it.due>today)?dayjs(it.due):dayjs(today);
+      it.due=base.add(parseInt(n,10),'day').format('YYYY-MM-DD');
+      saveItem(it); render();
+    });
     document.querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>{fPerson=b.getAttribute('data-fp');fCustomer='';rebuildLinks();render();});
     document.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{fCustomer=b.getAttribute('data-fc');fPerson='';rebuildLinks();render();});
 
@@ -1185,7 +1259,8 @@
     const ref=refDate?dayjs(refDate):dayjs(todayISO());
     const typeLabels={todo:'To-do',reminder:'Reminder',meeting:'Meeting',doc:'Doc'};
     const allOpen=items.filter(x=>!x.done).sort((a,b)=>{
-      if(a.due&&b.due) return a.due<b.due?-1:a.due>b.due?1:0;
+      if(a.due&&b.due&&a.due!==b.due) return a.due<b.due?-1:1;
+      if(a.due&&b.due){ const at=a.time||'99',bt=b.time||'99'; if(at!==bt) return at<bt?-1:1; return 0; }
       if(a.due) return -1;
       if(b.due) return 1;
       return b.ts-a.ts;
@@ -1255,7 +1330,7 @@
                 ${(it.people||[]).length?'<span style="font-size:10px;color:#777;">'+it.people.map(p=>esc(p)).join(', ')+'</span>':''}
                 ${it.repeat==='weekly'?'<span style="font-size:10px;color:#2563eb;">&#8635; Weekly</span>':''}
               </div>
-              ${it.meta?'<div style="font-size:11px;color:#7c3aed;margin-top:3px;">'+esc(it.meta)+'</div>':''}
+              ${(it.time||it.meta)?'<div style="font-size:11px;color:#7c3aed;margin-top:3px;">'+[it.time?fmtTime(it.time):'',esc(it.meta||'')].filter(Boolean).join(' · ')+'</div>':''}
               ${it.body?'<div style="font-size:11px;color:#888;margin-top:3px;line-height:1.4;">'+esc(it.body.slice(0,150))+(it.body.length>150?'...':'')+'</div>':''}
             </div>
           </div>
@@ -1314,6 +1389,7 @@
         const high=it.priority==='high';
         let line='• '+(high?'(!) ':'')+it.text;
         const extras=[];
+        if(it.time) extras.push(fmtTime(it.time));
         if(it.meta) extras.push(it.meta);
         if(it.customer) extras.push(it.customer);
         if(it.people&&it.people.length) extras.push(it.people.join(', '));
@@ -1410,7 +1486,7 @@
     calendarView.querySelectorAll('[data-cal-date]').forEach(el=>{
       el.onclick=()=>{
         const d=el.getAttribute('data-cal-date');
-        const dayItems=itemsByDate[d]||[];
+        const dayItems=(itemsByDate[d]||[]).slice().sort((a,b)=>((a.time||'99')<(b.time||'99')?-1:1));
         const label=dayjs(d).format('dddd, MMMM D, YYYY');
         const typeIcons={todo:'☐',reminder:'🔔',meeting:'📅',doc:'📄'};
         const typeColors={todo:'#2563eb',reminder:'#c2410c',meeting:'#7c3aed',doc:'#888'};
@@ -1426,7 +1502,7 @@
             const icon=typeIcons[it.kind]||'';
             const doneStyle=it.done?'text-decoration:line-through; opacity:0.55;':'';
             h+=`<div class="day-preview-item" data-edit="${it.id}" style="padding:10px 12px;border-radius:8px;margin-bottom:6px;background:var(--surface-2);cursor:pointer;border-left:3px solid ${color};${doneStyle}">
-              <div style="font-size:14px;font-weight:500;color:var(--text-primary);">${icon} ${it.priority==='high'?'<span style="color:#dc2626;">⚑</span> ':''}${esc(it.text)}</div>
+              <div style="font-size:14px;font-weight:500;color:var(--text-primary);">${icon} ${it.time?'<b>'+fmtTime(it.time)+'</b> ':''}${it.priority==='high'?'<span style="color:#dc2626;">⚑</span> ':''}${esc(it.text)}</div>
               ${it.people&&it.people.length?`<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">👤 ${it.people.join(', ')}</div>`:''}
               ${it.customer?`<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">🏢 ${it.customer}</div>`:''}
               ${it.meta?`<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">📍 ${it.meta}</div>`:''}
