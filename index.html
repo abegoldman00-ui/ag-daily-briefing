@@ -512,6 +512,11 @@
     }
 
     /* Touch devices have no hover: keep actions visible and tap targets large */
+    .section-group, #completed-section > div { position: relative; }
+    .swipe-bg { position: absolute; border-radius: var(--radius); background: #9ca3af; color: #fff; display: flex; align-items: center; padding-left: 18px; box-sizing: border-box; font-weight: 600; font-size: 14px; transition: background-color .15s ease; }
+    .swipe-bg.armed { background: #16a34a; }
+    .item-row.swiping { z-index: 1; }
+    #list-view { overflow-x: clip; }
     @media (hover: none) {
       .item-actions { opacity: 1; }
       .drag-handle { display: none; }
@@ -1327,11 +1332,59 @@
     return h;
   }
 
+  function bindSwipe(row){
+    const tb=row.querySelector('[data-toggle]');
+    if(!tb) return;
+    const id=tb.getAttribute('data-toggle');
+    let sx=0,sy=0,dx=0,lock=null,bg=null;
+    const threshold=()=>row.offsetWidth*0.35;
+    row.addEventListener('touchstart',e=>{
+      const t=e.touches[0]; sx=t.clientX; sy=t.clientY; dx=0; lock=null;
+    },{passive:true});
+    row.addEventListener('touchmove',e=>{
+      const t=e.touches[0],mx=t.clientX-sx,my=t.clientY-sy;
+      if(lock===null){
+        if(Math.abs(mx)<10&&Math.abs(my)<10) return;
+        lock=(mx>0&&Math.abs(mx)>Math.abs(my)*1.5)?'x':'y';
+        if(lock==='x'){
+          bg=document.createElement('div');
+          bg.className='swipe-bg';
+          bg.textContent=tb.textContent.trim()?'↺ Reopen':'✓ Done';
+          bg.style.cssText=`top:${row.offsetTop}px;left:${row.offsetLeft}px;width:${row.offsetWidth}px;height:${row.offsetHeight}px;`;
+          row.parentNode.insertBefore(bg,row);
+          row.classList.add('swiping');
+          row.style.transition='none';
+        }
+      }
+      if(lock!=='x') return;
+      e.preventDefault();
+      dx=Math.max(0,mx);
+      row.style.transform=`translateX(${dx}px)`;
+      bg.classList.toggle('armed',dx>threshold());
+    },{passive:false});
+    const end=()=>{
+      if(lock!=='x') return;
+      lock=null;
+      row.style.transition='transform .2s ease';
+      if(dx>threshold()){
+        row.style.transform=`translateX(${row.offsetWidth}px)`;
+        if(navigator.vibrate) navigator.vibrate(10);
+        setTimeout(()=>toggle(id),180);
+      } else {
+        row.style.transform='';
+        setTimeout(()=>{ if(bg) bg.remove(); row.classList.remove('swiping'); },200);
+      }
+    };
+    row.addEventListener('touchend',end);
+    row.addEventListener('touchcancel',end);
+  }
+
   function bind(){
     document.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggle(b.getAttribute('data-toggle')));
     document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDel(b.getAttribute('data-del')));
     document.querySelectorAll('[data-expand]').forEach(b=>b.onclick=()=>expand(b.getAttribute('data-expand')));
     document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(b.getAttribute('data-edit')));
+    if('ontouchstart' in window) document.querySelectorAll('.item-row').forEach(bindSwipe);
     document.querySelectorAll('[data-snooze]').forEach(b=>b.onclick=()=>{
       const [id,n]=b.getAttribute('data-snooze').split('|');
       const it=items.find(x=>x.id===id);
