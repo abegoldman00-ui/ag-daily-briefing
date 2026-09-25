@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="AG Briefing">
   <meta name="theme-color" content="#2563eb">
+  <meta name="app-version" content="2026-09-25.1">
   <title>AG Daily Briefing</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="favicon.svg">
@@ -516,6 +517,8 @@
     .swipe-bg { position: absolute; border-radius: var(--radius); background: #9ca3af; color: #fff; display: flex; align-items: center; padding-left: 18px; box-sizing: border-box; font-weight: 600; font-size: 14px; transition: background-color .15s ease; }
     .swipe-bg.armed { background: #16a34a; }
     .item-row.swiping { z-index: 1; }
+    #update-banner { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 12px; background: #1f2937; color: #fff; padding: 10px 12px 10px 16px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 14px; white-space: nowrap; animation: fadeIn .25s ease; }
+    #update-banner button { background: #2563eb; color: #fff; border: none; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; }
     #list-view { overflow-x: clip; }
     @media (hover: none) {
       .item-actions { opacity: 1; }
@@ -1738,6 +1741,25 @@
   $('view-calendar').onclick=()=>{currentView='calendar';switchView();};
 
   const themeBtn=$('btn-theme');
+
+  const APP_VERSION=(document.querySelector('meta[name="app-version"]')||{}).content||'';
+  async function checkForUpdate(){
+    if(!APP_VERSION||location.protocol==='file:'||$('update-banner')) return;
+    try{
+      const res=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});
+      if(!res.ok) return;
+      const m=(await res.text()).match(/<meta name="app-version" content="([^"]+)"/);
+      if(!m||m[1]===APP_VERSION) return;
+      const bar=document.createElement('div');
+      bar.id='update-banner';
+      bar.innerHTML='<span>New version available</span><button>Reload</button>';
+      bar.querySelector('button').onclick=()=>location.reload();
+      document.body.appendChild(bar);
+    }catch(e){}
+  }
+  setTimeout(checkForUpdate,3000);
+  setInterval(checkForUpdate,10*60*1000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkForUpdate(); });
   document.addEventListener('keydown',e=>{
     if(e.key!=='Escape') return;
     if(editModal.style.display!=='none') editModal.style.display='none';
