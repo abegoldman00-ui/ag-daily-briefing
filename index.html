@@ -503,7 +503,7 @@
       input, select, textarea, button { font-size: 16px; }
       .fbtn, #clearlinks { font-size: 12px !important; padding: 6px 10px !important; }
       .view-toggle button { padding: 6px 10px !important; font-size: 12px !important; }
-      #btn-email, #btn-print { padding: 6px 10px !important; font-size: 11px !important; }
+      #btn-brief, #btn-email, #btn-print { padding: 6px 10px !important; font-size: 11px !important; }
       #btn-logout { font-size: 11px !important; }
       .item-row { padding: 12px !important; }
       .calendar-grid { font-size: 10px; }
@@ -551,11 +551,14 @@
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
         <button id="btn-theme" style="font-size:14px; padding:4px 8px; border-radius:20px; border:1px solid var(--border); background:var(--surface-1);" title="Toggle dark/light mode">☀</button>
+        <button id="btn-brief" style="font-size:12px; padding:6px 16px; border-radius:20px;">Morning briefing</button>
         <button id="btn-email" style="font-size:12px; padding:6px 16px; border-radius:20px;">Email briefing</button>
         <button id="btn-print" style="font-size:12px; padding:6px 16px; border-radius:20px;">Print</button>
         <button id="btn-logout" class="btn-ghost" style="font-size:12px;">Sign out</button>
       </div>
     </div>
+
+    <div id="briefing-panel" style="display:none; margin-bottom:10px;"></div>
 
     <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
       <div style="position:relative; flex:1; min-width:120px;">
@@ -675,8 +678,94 @@
     document.getElementById('date-subtitle').textContent = dayjs().format('dddd, MMMM D, YYYY');
     if(USE_SUPABASE) await migrateLocalToSupabase();
     load();
+    if(USE_SUPABASE) loadBriefings();
   }
-  function showAuth() { authScreen.style.display = ''; appEl.style.display = 'none'; }
+  function showAuth() { authScreen.style.display = ''; appEl.style.display = 'none'; briefs=[]; const bp=document.getElementById('briefing-panel'); if(bp){bp.innerHTML='';bp.style.display='none';} }
+
+  let briefs=[], briefOpen=true, pastOpen=false;
+  try{ briefOpen=localStorage.getItem('agbriefing:briefOpen')!=='0'; }catch(e){}
+  function easternToday(){
+    return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  }
+  async function loadBriefings(){
+    if(!USE_SUPABASE||!session) return;
+    const { data, error } = await supabase
+      .from('briefings')
+      .select('briefing_date, content, created_at')
+      .order('briefing_date', { ascending: false })
+      .limit(7);
+    if(error){ console.error('briefings error:', error); return; }
+    briefs=data||[];
+    renderBriefingPanel();
+  }
+  function renderBriefingPanel(msg){
+    const panel=document.getElementById('briefing-panel');
+    if(!briefs.length && !msg){ panel.style.display='none'; panel.innerHTML=''; return; }
+    panel.style.display='';
+    panel.innerHTML='';
+    const card=document.createElement('div');
+    card.style.cssText='background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow-sm);overflow:hidden;';
+    const latest=briefs[0];
+    const isToday=latest&&latest.briefing_date===easternToday();
+    const head=document.createElement('button');
+    head.style.cssText='display:flex;width:100%;justify-content:space-between;align-items:center;background:none;border:none;padding:0;text-align:left;cursor:pointer;';
+    const title=document.createElement('span');
+    title.style.cssText='font-size:14px;font-weight:600;color:var(--text-primary);';
+    if(latest){
+      const d=dayjs(latest.briefing_date);
+      title.textContent=isToday?"Today's briefing · "+d.format('ddd, MMM D'):'Latest briefing · '+d.format('dddd, MMM D');
+    } else title.textContent="Today's briefing";
+    const arrow=document.createElement('span');
+    arrow.textContent=briefOpen?'▾':'▸';
+    arrow.style.color='var(--text-muted)';
+    head.append(title,arrow);
+    head.onclick=()=>{briefOpen=!briefOpen;try{localStorage.setItem('agbriefing:briefOpen',briefOpen?'1':'0');}catch(e){}renderBriefingPanel(msg);};
+    card.appendChild(head);
+    if(briefOpen){
+      if(msg){
+        const m=document.createElement('div');
+        m.textContent=msg;
+        m.style.cssText='font-size:12px;color:var(--text-muted);margin-top:8px;';
+        card.appendChild(m);
+      }
+      if(latest){
+        const body=document.createElement('div');
+        body.textContent=latest.content;
+        body.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.55;color:var(--text-secondary);margin-top:10px;';
+        card.appendChild(body);
+      }
+      const past=briefs.slice(1,7);
+      if(past.length){
+        const link=document.createElement('button');
+        link.textContent=(pastOpen?'Hide':'Past briefings')+' ('+past.length+')';
+        link.style.cssText='background:none;border:none;padding:0;margin-top:10px;font-size:12px;color:var(--text-accent);cursor:pointer;';
+        link.onclick=()=>{pastOpen=!pastOpen;renderBriefingPanel(msg);};
+        card.appendChild(link);
+        if(pastOpen){
+          past.forEach(b=>{
+            const det=document.createElement('details');
+            det.style.cssText='margin-top:6px;border-top:1px solid var(--border);padding-top:6px;';
+            const sum=document.createElement('summary');
+            sum.textContent=dayjs(b.briefing_date).format('dddd, MMM D');
+            sum.style.cssText='font-size:12px;font-weight:600;cursor:pointer;color:var(--text-primary);';
+            const pre=document.createElement('div');
+            pre.textContent=b.content;
+            pre.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;color:var(--text-secondary);margin-top:6px;';
+            det.append(sum,pre);
+            card.appendChild(det);
+          });
+        }
+      }
+    }
+    panel.appendChild(card);
+  }
+  document.getElementById('btn-brief').onclick=async()=>{
+    await loadBriefings();
+    const hasToday=briefs.length&&briefs[0].briefing_date===easternToday();
+    briefOpen=true;
+    renderBriefingPanel(hasToday?null:"Today's briefing arrives around 7:00 AM on weekdays.");
+    document.getElementById('briefing-panel').scrollIntoView({behavior:'smooth',block:'start'});
+  };
 
   document.getElementById('auth-login').onclick = async () => {
     authError.textContent = '';
