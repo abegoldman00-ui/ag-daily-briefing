@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="AG Briefing">
   <meta name="theme-color" content="#2563eb">
-  <meta name="app-version" content="2026-09-25.4">
+  <meta name="app-version" content="2026-09-25.5">
   <title>AG Daily Briefing</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="favicon.svg">
@@ -905,7 +905,7 @@
   // Each name has one canonical spelling: prefer normal capitalization ("Acme") over
   // ALL CAPS over all lowercase, then the most used; all-lowercase names get capitalized.
   const nameKey=s=>(s||'').trim().replace(/\s+/g,' ').toLowerCase();
-  let canonPeople=new Map(), canonCust=new Map();
+  let canonPeople=new Map(), canonCust=new Map(), personCust=new Map();
   function titleCase(s){ return s.replace(/\b[a-z]/g,c=>c.toUpperCase()); }
   const caseRank=s=>(/[A-Z]/.test(s)&&/[a-z]/.test(s))?2:/[A-Z]/.test(s)?1:0;
   function pickCanonical(counts){
@@ -924,6 +924,29 @@
     items.forEach(it=>{ (it.people||[]).forEach(p=>tally(pc,p)); tally(cc,it.customer); });
     canonPeople=new Map([...pc].map(([k,c])=>[k,pickCanonical(c)]));
     canonCust=new Map([...cc].map(([k,c])=>[k,pickCanonical(c)]));
+
+    // Each person's usual customer: seen together on 2+ items and on 70%+ of
+    // that person's items that have a customer. Otherwise no guess.
+    const links=new Map();
+    items.forEach(it=>{
+      const ck=nameKey(it.customer);
+      if(!ck) return;
+      (it.people||[]).forEach(pp=>{
+        const pk=nameKey(pp);
+        if(!links.has(pk)) links.set(pk,new Map());
+        links.get(pk).set(ck,(links.get(pk).get(ck)||0)+1);
+      });
+    });
+    personCust=new Map();
+    links.forEach((counts,pk)=>{
+      const total=[...counts.values()].reduce((a,b)=>a+b,0);
+      const [ck,n]=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
+      if(n>=2&&n/total>=0.7) personCust.set(pk,canonCust.get(ck));
+    });
+  }
+  function inferCustomer(people){
+    const guesses=new Set((people||[]).map(p=>personCust.get(nameKey(p))).filter(Boolean));
+    return guesses.size===1?[...guesses][0]:'';
   }
   function canonName(map,raw){
     const clean=(raw||'').trim().replace(/\s+/g,' ');
@@ -1241,6 +1264,8 @@
       });
     }
 
+    if(!out.customer) out.customer=inferCustomer(out.people);
+
     out.text=t.replace(/\s+([,.;!?])/g,'$1').replace(/\s+/g,' ').replace(/^[\s,;.]+|[\s,;.]+$/g,'').trim();
     return out;
   }
@@ -1258,7 +1283,8 @@
       }
       el.dataset.auto=val?'1':'';
     };
-    fill(customerEl, parsed.customer ? canonName(canonCust,parsed.customer) : '');
+    const guess=parsed.customer||inferCustomer(parsed.people.concat(parsePeople(peopleEl.value)));
+    fill(customerEl, guess ? canonName(canonCust,guess) : '');
     fill(peopleEl, canonPeopleList(parsed.people).join(', '));
     fill(dueEl, canDue?parsed.due:'');
     fill($('itime'), canDue?parsed.time:'');
@@ -1274,7 +1300,7 @@
     const canDue=(k==='todo'||k==='reminder'||k==='meeting');
     const it={id,text,kind:k,done:false,ts:Date.now(),
       people:canonPeopleList(parsePeople(peopleEl.value).concat(parsed.people)),
-      customer:canonName(canonCust,customerEl.value.trim()||parsed.customer),
+      customer:canonName(canonCust,customerEl.value.trim()||parsed.customer||inferCustomer(parsePeople(peopleEl.value))),
       priority:prioEl.value,
       due:canDue?(dueEl.value||parsed.due):'',
       time:canDue?($('itime').value||parsed.time):'',
@@ -2077,6 +2103,7 @@
   entryEl.addEventListener('input',previewParse);
   kindEl.addEventListener('change',previewParse);
   [customerEl,peopleEl,dueEl,$('itime')].forEach(el=>el.addEventListener('input',()=>{el.dataset.auto='';el.classList.remove('autofilled');}));
+  peopleEl.addEventListener('input',previewParse);
   $('toggle-add').onclick=()=>{const p=$('add-panel');const show=p.style.display==='none';p.style.display=show?'':'none';$('toggle-add').textContent=show?'✕ Close':'+ Add';if(show)$('entry').focus();};
   $('view-list').onclick=()=>{currentView='list';switchView();};
   $('view-calendar').onclick=()=>{currentView='calendar';switchView();};
