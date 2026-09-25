@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="AG Briefing">
   <meta name="theme-color" content="#2563eb">
-  <meta name="app-version" content="2026-09-25.2">
+  <meta name="app-version" content="2026-09-25.3">
   <title>AG Daily Briefing</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="favicon.svg">
@@ -517,6 +517,18 @@
     .swipe-bg { position: absolute; border-radius: var(--radius); background: #9ca3af; color: #fff; display: flex; align-items: center; padding-left: 18px; box-sizing: border-box; font-weight: 600; font-size: 14px; transition: background-color .15s ease; }
     .swipe-bg.armed { background: #16a34a; }
     .item-row.swiping { z-index: 1; }
+    .menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 190px; display: flex; flex-direction: column; padding: 6px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); animation: fadeIn .15s ease; }
+    .menu button { text-align: left; border: none; background: none; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: var(--text-primary); white-space: nowrap; }
+    .menu button:hover { background: var(--surface-2); opacity: 1; }
+    #sync-badge { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 600; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 10px; }
+    #btn-mic.listening { background: #dc2626; color: #fff; border-color: #dc2626; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(220,38,38,.2); } }
+    .undo-toast { flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 32px); box-sizing: border-box; }
+    .undo-toast .fu-btn { background: var(--text-accent); color: #fff; border-radius: 999px; padding: 5px 12px; }
+    .undo-toast .fu-x { color: var(--text-muted); padding: 0 4px; }
+    .cv-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin: 14px 0 6px; }
+    .cv-item { padding: 9px 12px; border-radius: 8px; margin-bottom: 6px; background: var(--surface-2); cursor: pointer; font-size: 14px; color: var(--text-primary); }
+    .cv-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     #update-banner { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 12px; background: #1f2937; color: #fff; padding: 10px 12px 10px 16px; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 14px; white-space: nowrap; animation: fadeIn .25s ease; }
     #update-banner button { background: #2563eb; color: #fff; border: none; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; }
     #list-view { overflow-x: clip; }
@@ -552,7 +564,7 @@
       input, select, textarea, button { font-size: 16px; }
       .fbtn, #clearlinks { font-size: 12px !important; padding: 6px 10px !important; }
       .view-toggle button { padding: 6px 10px !important; font-size: 12px !important; }
-      #btn-brief, #btn-email, #btn-print { padding: 6px 10px !important; font-size: 11px !important; }
+      #btn-brief, #btn-reports { padding: 6px 10px !important; font-size: 11px !important; }
       #btn-logout { font-size: 11px !important; }
       .item-row { padding: 12px !important; }
       .calendar-grid { font-size: 10px; }
@@ -597,12 +609,19 @@
       <div>
         <h2 style="font-size:22px; font-weight:700; margin:0; color:var(--text-primary); letter-spacing:-0.3px;">AG Daily Briefing</h2>
         <p id="date-subtitle" style="margin:3px 0 0; font-size:13px; color:var(--text-muted);"></p>
+        <span id="sync-badge" style="display:none;"></span>
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
         <button id="btn-theme" style="font-size:14px; padding:4px 8px; border-radius:20px; border:1px solid var(--border); background:var(--surface-1);" title="Toggle dark/light mode">☀</button>
         <button id="btn-brief" style="font-size:12px; padding:6px 16px; border-radius:20px;">Morning briefing</button>
-        <button id="btn-email" style="font-size:12px; padding:6px 16px; border-radius:20px;">Email briefing</button>
-        <button id="btn-print" style="font-size:12px; padding:6px 16px; border-radius:20px;">Print</button>
+        <div style="position:relative;">
+          <button id="btn-reports" style="font-size:12px; padding:6px 16px; border-radius:20px;" aria-haspopup="true" aria-expanded="false">Reports ▾</button>
+          <div id="reports-menu" class="menu" style="display:none;">
+            <button id="btn-email">✉️ Email briefing</button>
+            <button id="btn-print">🖨 Print briefing</button>
+            <button id="btn-recap">📊 Weekly recap</button>
+          </div>
+        </div>
         <button id="btn-logout" class="btn-ghost" style="font-size:12px;">Sign out</button>
       </div>
     </div>
@@ -616,6 +635,7 @@
       <select id="fperson" style="width:120px; padding:6px;"><option value="">Person: all</option></select>
       <select id="fcustomer" style="width:130px; padding:6px;"><option value="">Customer: all</option></select>
       <button id="toggle-add" style="font-size:12px; padding:6px 14px; border-radius:20px; background:#16a34a; color:#fff; border:none; cursor:pointer; white-space:nowrap; font-weight:600;">+ Add</button>
+      <button id="btn-mic" title="Add by voice" aria-label="Add by voice" style="display:none; font-size:15px; padding:5px 11px; border-radius:20px;">🎤</button>
     </div>
     <div id="typefilters" style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px; align-items:center;">
       <button data-filter="all" class="fbtn">All</button>
@@ -975,8 +995,12 @@
 
   async function load(){
     if (USE_SUPABASE) {
+      await flushQueue();
       const { data, error } = await supabase.from('items').select('*').order('created_at', { ascending: false });
-      if (error) { console.error('load error:', error); items = []; }
+      if (error) {
+        console.error('load error:', error);
+        try { items = JSON.parse(localStorage.getItem(cacheKey()) || '[]'); } catch(e) { items = []; }
+      }
       else {
         items = (data || []).map(row => {
           const dm = decodeMeta(row.meta);
@@ -985,13 +1009,21 @@
             ts: new Date(row.created_at).getTime(), people: row.people || [],
             customer: row.customer || '', priority: row.priority,
             due: row.due || '', meta: dm.meta, body: row.body || '',
-            repeat: dm.repeat, time: dm.time, sortOrder: row.sort_order || 0
+            repeat: dm.repeat, time: dm.time, doneAt: dm.doneAt, sortOrder: row.sort_order || 0
           };
         });
       }
     } else {
       try { items = JSON.parse(localStorage.getItem(LSKEY) || '[]'); } catch(e) { items = []; }
       items.forEach((it,i) => { if(!it.sortOrder) it.sortOrder = i; });
+    }
+    if (USE_SUPABASE) {
+      readQueue().forEach(op=>{
+        items=items.filter(x=>x.id!==op.id);
+        if(op.op==='save'&&op.item) items.push(op.item);
+      });
+      cacheItems();
+      updateSyncBadge();
     }
     advanceRecurring();
     consolidateNames();
@@ -1029,13 +1061,15 @@
     let m = it.meta || '';
     if(it.repeat) m = (m ? m+' [weekly]' : '[weekly]');
     if(it.time) m = (m ? m+' ' : '')+'[t:'+it.time+']';
+    if(it.done && it.doneAt) m = (m ? m+' ' : '')+'[d:'+it.doneAt+']';
     return m;
   }
   function decodeMeta(metaStr){
     const hasRepeat = (metaStr||'').includes('[weekly]');
     const tm = (metaStr||'').match(/\[t:(\d{2}:\d{2})\]/);
-    const clean = (metaStr||'').replace(/\s*\[weekly\]/g,'').replace(/\s*\[t:\d{2}:\d{2}\]/g,'').trim();
-    return { meta: clean, repeat: hasRepeat ? 'weekly' : '', time: tm ? tm[1] : '' };
+    const dm = (metaStr||'').match(/\[d:(\d{4}-\d{2}-\d{2})\]/);
+    const clean = (metaStr||'').replace(/\s*\[weekly\]/g,'').replace(/\s*\[t:\d{2}:\d{2}\]/g,'').replace(/\s*\[d:\d{4}-\d{2}-\d{2}\]/g,'').trim();
+    return { meta: clean, repeat: hasRepeat ? 'weekly' : '', time: tm ? tm[1] : '', doneAt: dm ? dm[1] : '' };
   }
   function fmtTime(t){
     if(!t) return '';
@@ -1045,22 +1079,63 @@
     return h12+(m?':'+String(m).padStart(2,'0'):'')+ap;
   }
 
+  // Offline support: writes that fail (no signal, flaky connection) are queued in
+  // localStorage and retried; the last known board is cached so the app opens offline.
+  const QKEY='agbriefing:pending';
+  const cacheKey=()=>'agbriefing:cache:'+(session&&session.user?session.user.id:'anon');
+  function readQueue(){ try{ return JSON.parse(localStorage.getItem(QKEY)||'[]'); }catch(e){ return []; } }
+  function writeQueue(q){ try{ localStorage.setItem(QKEY,JSON.stringify(q)); }catch(e){} updateSyncBadge(); }
+  function enqueue(op){ const q=readQueue().filter(x=>x.id!==op.id); op.qts=Date.now(); q.push(op); writeQueue(q); }
+  function dequeue(id){ const q=readQueue(); if(q.some(x=>x.id===id)) writeQueue(q.filter(x=>x.id!==id)); }
+  function plainItem(it){ const c=Object.assign({},it); delete c._open; return c; }
+  function cacheItems(){ if(!USE_SUPABASE) return; try{ localStorage.setItem(cacheKey(),JSON.stringify(items.map(plainItem))); }catch(e){} }
+  function rowFor(it){
+    return {
+      id: it.id, kind: it.kind, text: it.text, body: it.body || null,
+      meta: encodeMeta(it) || null, people: it.people || [], customer: it.customer || null,
+      priority: it.priority, due: it.due || null, done: it.done
+    };
+  }
+  function updateSyncBadge(){
+    const el=document.getElementById('sync-badge');
+    if(!el) return;
+    const n=readQueue().length;
+    el.style.display=n?'':'none';
+    el.textContent='⟳ '+n+(n===1?' change':' changes')+' not synced yet';
+  }
+  let flushing=false;
+  async function flushQueue(){
+    if(!USE_SUPABASE||!session||flushing||!navigator.onLine) return;
+    flushing=true;
+    try{
+      for(const op of readQueue()){
+        const res = op.op==='save'
+          ? await supabase.from('items').upsert(op.row)
+          : await supabase.from('items').delete().eq('id',op.id);
+        if(res.error) break;
+        writeQueue(readQueue().filter(x=>!(x.id===op.id&&x.qts===op.qts)));
+      }
+    } finally { flushing=false; }
+  }
+
   async function saveItem(it) {
     if (USE_SUPABASE) {
-      const row = {
-        id: it.id, kind: it.kind, text: it.text, body: it.body || null,
-        meta: encodeMeta(it) || null, people: it.people || [], customer: it.customer || null,
-        priority: it.priority, due: it.due || null, done: it.done
-      };
+      cacheItems();
+      const row = rowFor(it);
+      if (!navigator.onLine) { enqueue({op:'save',id:it.id,row,item:plainItem(it)}); return; }
       const { error } = await supabase.from('items').upsert(row);
-      if (error) console.error('save error:', error);
+      if (error) { console.error('save error:', error); enqueue({op:'save',id:it.id,row,item:plainItem(it)}); }
+      else dequeue(it.id);
     } else { save(); }
   }
 
   async function deleteItem(id) {
     if (USE_SUPABASE) {
+      cacheItems();
+      if (!navigator.onLine) { enqueue({op:'delete',id}); return; }
       const { error } = await supabase.from('items').delete().eq('id', id);
-      if (error) console.error('delete error:', error);
+      if (error) { console.error('delete error:', error); enqueue({op:'delete',id}); }
+      else dequeue(id);
     } else { save(); }
   }
 
@@ -1071,6 +1146,7 @@
     const out={text, due:'', time:'', people:[], customer:''};
     const today=dayjs(todayISO());
     let t=' '+text+' ';
+    t=t.replace(/(\d)\s*([ap])\.\s?m\.?(?=\s)/gi,'$1$2m');
 
     const tm=t.match(/\s(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s/i);
     if(tm){
@@ -1101,6 +1177,25 @@
     while((m2=t.match(/\s@([A-Za-z][\w.-]*)/))){ out.people.push(m2[1]); t=t.replace(m2[0],' '); }
     const cm=t.match(/\s#([\w][\w &.-]*?)(?=\s{2}|\s$|\s[@#])/) || t.match(/\s#(\S+)/);
     if(cm){ out.customer=cm[1].trim(); t=t.replace(cm[0],' '); }
+
+    // Recognize customers and people already on the board, without # or @.
+    // A capitalized mention counts ("call John"); after "at/for" any case counts,
+    // and "at Acme"/"for Acme" is dropped from the title.
+    const escRe=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const byLen=m=>[...m.values()].filter(n=>n.length>=2).sort((a,b)=>b.length-a.length);
+    if(!out.customer){
+      for(const name of byLen(canonCust)){
+        const prep=t.match(new RegExp('\\s(?:at|for)\\s+('+escRe(name)+')(?=[\\s,.!?])','i'));
+        if(prep){ out.customer=name; t=t.replace(prep[0],' '); break; }
+        const bare=t.match(new RegExp('\\s('+escRe(name)+')(?=[\\s,.!?\'])','i'));
+        if(bare&&/[A-Z0-9]/.test(bare[1][0])){ out.customer=name; break; }
+      }
+    }
+    for(const name of byLen(canonPeople)){
+      if(out.people.some(p=>nameKey(p)===nameKey(name))) continue;
+      const m=t.match(new RegExp('\\s('+escRe(name)+')(?=[\\s,.!?\'])','i'));
+      if(m&&/[A-Z]/.test(m[1][0])) out.people.push(name);
+    }
 
     out.text=t.replace(/\s+/g,' ').trim();
     return out;
@@ -1137,8 +1232,46 @@
       saveItem(it); render();
     } else {
       it.done=!it.done;
+      it.doneAt=it.done?todayISO():'';
       saveItem(it); render();
+      if(it.done && it.kind!=='doc') showFollowUp(it);
     }
+  }
+
+  function newItem(fields){
+    const maxOrder=items.reduce((m,x)=>Math.max(m,x.sortOrder||0),0);
+    const it=Object.assign({
+      id: USE_SUPABASE ? crypto.randomUUID() : 'i'+Date.now(),
+      text:'', kind:'todo', done:false, ts:Date.now(), people:[], customer:'',
+      priority:'normal', due:'', time:'', meta:'', body:'', repeat:'', doneAt:'',
+      sortOrder:maxOrder+1
+    },fields);
+    items.push(it);
+    saveItem(it); rebuildLinks(); render();
+    return it;
+  }
+
+  function showFollowUp(it){
+    if(undoTimer) clearTimeout(undoTimer);
+    undoItem=null;
+    undoContainer.innerHTML=`<div class="undo-toast">✓ Done · Follow up?
+      <button class="fu-btn" data-fu="3">3 days</button>
+      <button class="fu-btn" data-fu="7">1 week</button>
+      <button class="fu-x" data-fu="0" aria-label="No follow-up">✕</button></div>`;
+    undoContainer.querySelectorAll('[data-fu]').forEach(b=>b.onclick=()=>{
+      const n=parseInt(b.getAttribute('data-fu'),10);
+      if(undoTimer) clearTimeout(undoTimer);
+      if(!n){ undoContainer.innerHTML=''; return; }
+      const due=dayjs(todayISO()).add(n,'day');
+      newItem({
+        text:'Follow up: '+it.text.replace(/^(follow up:\s*)+/i,''),
+        people:(it.people||[]).slice(), customer:it.customer||'',
+        due:due.format('YYYY-MM-DD')
+      });
+      undoContainer.innerHTML=`<div class="undo-toast">Follow-up added for ${due.format('ddd, MMM D')}</div>`;
+      undoTimer=setTimeout(()=>{ undoContainer.innerHTML=''; },2500);
+    });
+    undoTimer=setTimeout(()=>{ undoContainer.innerHTML=''; },8000);
   }
 
   function confirmDel(id){
@@ -1383,6 +1516,40 @@
     return h;
   }
 
+  function openCustomer(name){
+    const key=nameKey(name);
+    const mine=items.filter(it=>nameKey(it.customer)===key);
+    const byDue=(a,b)=>((a.due||'9999')+(a.time||'99')).localeCompare((b.due||'9999')+(b.time||'99'));
+    const open=mine.filter(it=>!it.done&&it.kind!=='doc').sort(byDue);
+    const docs=mine.filter(it=>!it.done&&it.kind==='doc').sort((a,b)=>b.ts-a.ts);
+    const done=mine.filter(it=>it.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')||b.ts-a.ts).slice(0,5);
+    const people=[...new Set(mine.flatMap(it=>it.people||[]))];
+    const overdue=open.filter(it=>it.due&&it.due<todayISO()).length;
+    const row=(it,sub)=>`<div class="cv-item" data-cv="${it.id}">${it.priority==='high'&&!it.done?'<span style="color:#dc2626;">⚑</span> ':''}${esc(it.text)}${sub?`<div class="cv-sub">${sub}</div>`:''}</div>`;
+    const when=it=>[it.due?friendlyDate(it.due):'',it.time?fmtTime(it.time):'',kindMeta[it.kind]?kindMeta[it.kind].label:'',(it.people||[]).map(esc).join(', ')].filter(Boolean).join(' · ');
+    let h=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div><h3 style="margin:0;font-size:18px;color:var(--text-primary);">🏢 ${esc(canonCust.get(key)||name)}</h3>
+        <div class="cv-sub">${open.length} open${overdue?` · <span style="color:var(--text-warning);font-weight:600;">${overdue} overdue</span>`:''}${people.length?' · '+people.map(esc).join(', '):''}</div></div>
+        <button id="cv-close" style="background:none;border:none;font-size:20px;color:var(--text-muted);padding:0 4px;">✕</button>
+      </div>`;
+    h+=`<div class="cv-section">Open</div>`+(open.length?open.map(it=>row(it,when(it))).join(''):`<div class="cv-sub">Nothing open.</div>`);
+    if(docs.length) h+=`<div class="cv-section">Notes &amp; docs</div>`+docs.map(it=>row(it,it.body?esc(it.body.slice(0,90))+(it.body.length>90?'…':''):'')).join('');
+    if(done.length) h+=`<div class="cv-section">Recently completed</div>`+done.map(it=>row(it,it.doneAt?'Done '+dayjs(it.doneAt).format('ddd, MMM D'):'Done')).join('');
+    h+=`<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+        <button id="cv-add" class="btn-primary" style="flex:1;">+ Add item</button>
+        <button id="cv-filter" style="flex:1;">Show on board</button>
+      </div>`;
+    const overlay=$('day-preview');
+    $('day-preview-inner').innerHTML=h;
+    overlay.style.display='flex';
+    const close=()=>{overlay.style.display='none';};
+    $('cv-close').onclick=close;
+    overlay.onclick=e=>{if(e.target===overlay)close();};
+    $('day-preview-inner').querySelectorAll('[data-cv]').forEach(el=>el.onclick=()=>{close();openEdit(el.getAttribute('data-cv'));});
+    $('cv-filter').onclick=()=>{close();fCustomer=canonCust.get(key)||name;fPerson='';rebuildLinks();render();};
+    $('cv-add').onclick=()=>{close();customerEl.value=canonCust.get(key)||name;$('add-panel').style.display='';$('toggle-add').textContent='✕ Close';entryEl.focus();};
+  }
+
   function bindSwipe(row){
     const tb=row.querySelector('[data-toggle]');
     if(!tb) return;
@@ -1446,7 +1613,7 @@
       saveItem(it); render();
     });
     document.querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>{fPerson=b.getAttribute('data-fp');fCustomer='';rebuildLinks();render();});
-    document.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>{fCustomer=b.getAttribute('data-fc');fPerson='';rebuildLinks();render();});
+    document.querySelectorAll('[data-fc]').forEach(b=>b.onclick=()=>openCustomer(b.getAttribute('data-fc')));
 
     document.querySelectorAll('[data-drag-id]').forEach(el=>{
       el.addEventListener('dragstart',(e)=>{
@@ -1637,6 +1804,33 @@
     window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
   }
 
+  function weeklyRecap(){
+    const today=dayjs(todayISO());
+    const start=today.subtract((today.day()+6)%7,'day');
+    const weekEnd=start.add(6,'day');
+    const startISO=start.format('YYYY-MM-DD'), todayStr=today.format('YYYY-MM-DD'), endISO=weekEnd.format('YYYY-MM-DD');
+    const done=items.filter(it=>it.done&&it.doneAt&&it.doneAt>=startISO&&it.doneAt<=todayStr)
+      .sort((a,b)=>a.doneAt.localeCompare(b.doneAt));
+    const rolling=items.filter(it=>!it.done&&it.kind!=='doc'&&it.due&&it.due<=endISO)
+      .sort((a,b)=>(a.due+(a.time||'99')).localeCompare(b.due+(b.time||'99')));
+    const nextWeek=items.filter(it=>!it.done&&it.due&&it.due>endISO&&it.due<=weekEnd.add(7,'day').format('YYYY-MM-DD'));
+    const touched=new Map();
+    items.filter(it=>it.customer&&((it.done&&it.doneAt>=startISO)||dayjs(it.ts).format('YYYY-MM-DD')>=startISO))
+      .forEach(it=>touched.set(nameKey(it.customer),it.customer));
+    const line=(it,extra)=>'• '+it.text+[extra,it.customer].filter(Boolean).map(x=>' — '+x).join('')+'\n';
+
+    let text='AG WEEKLY RECAP\nWeek of '+start.format('MMM D')+' – '+today.format('MMM D, YYYY')+'\n\n';
+    text+='COMPLETED ('+done.length+')\n';
+    text+=done.length?done.map(it=>line(it,dayjs(it.doneAt).format('ddd'))).join(''):'• Nothing marked done yet this week\n';
+    text+='\nROLLING OVER ('+rolling.length+')\n';
+    text+=rolling.length?rolling.map(it=>line(it,(it.due<todayStr?'overdue since ':'due ')+dayjs(it.due).format('ddd M/D'))).join(''):'• All clear\n';
+    text+='\nCUSTOMERS TOUCHED ('+touched.size+')\n'+(touched.size?[...touched.values()].sort().join(', '):'None')+'\n';
+    text+='\nNEXT WEEK: '+nextWeek.length+(nextWeek.length===1?' item':' items')+' scheduled\n';
+
+    const subject='AG Weekly Recap — Week of '+start.format('MMM D');
+    window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
+  }
+
   function renderCalendar(){
     const first=dayjs().year(calYear).month(calMonth).date(1);
     const startDay=first.day();
@@ -1782,8 +1976,40 @@
   fCustomerEl.onchange=()=>{fCustomer=fCustomerEl.value;render();rebuildLinks();};
   clearLinksEl.onclick=()=>{fPerson='';fCustomer='';rebuildLinks();render();};
   searchEl.addEventListener('input',()=>{searchQ=searchEl.value.trim();render();});
-  $('btn-print').onclick=printBriefing;
-  $('btn-email').onclick=emailBriefing;
+  const reportsMenu=$('reports-menu');
+  const setMenu=open=>{ reportsMenu.style.display=open?'':'none'; $('btn-reports').setAttribute('aria-expanded',open?'true':'false'); };
+  $('btn-reports').onclick=e=>{ e.stopPropagation(); setMenu(reportsMenu.style.display==='none'); };
+  document.addEventListener('click',e=>{ if(!reportsMenu.contains(e.target)) setMenu(false); });
+  $('btn-print').onclick=()=>{ setMenu(false); printBriefing(); };
+  $('btn-email').onclick=()=>{ setMenu(false); emailBriefing(); };
+  $('btn-recap').onclick=()=>{ setMenu(false); weeklyRecap(); };
+
+  // Voice quick-add: fills the add box; the user reviews and taps Add.
+  const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(SpeechRec){
+    const mic=$('btn-mic');
+    mic.style.display='';
+    let rec=null;
+    mic.onclick=()=>{
+      if(rec){ rec.stop(); return; }
+      $('add-panel').style.display=''; $('toggle-add').textContent='✕ Close';
+      rec=new SpeechRec();
+      rec.lang='en-US'; rec.interimResults=true; rec.continuous=false;
+      const before=entryEl.value;
+      rec.onresult=e=>{
+        const said=[...e.results].map(r=>r[0].transcript).join(' ').trim();
+        entryEl.value=(before?before+' ':'')+said.charAt(0).toUpperCase()+said.slice(1);
+      };
+      rec.onend=()=>{ rec=null; mic.classList.remove('listening'); mic.textContent='🎤'; entryEl.focus(); };
+      rec.onerror=e=>{ if(e.error==='not-allowed') alert('Microphone access is blocked. Allow it in your browser settings, or use the keyboard\'s dictation mic.'); };
+      mic.classList.add('listening'); mic.textContent='● Listening';
+      try{ rec.start(); }catch(err){ rec=null; mic.classList.remove('listening'); mic.textContent='🎤'; }
+    };
+  }
+
+  window.addEventListener('online',()=>{ flushQueue(); });
+  setInterval(()=>{ if(readQueue().length) flushQueue(); },30000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&readQueue().length) flushQueue(); });
   $('toggle-add').onclick=()=>{const p=$('add-panel');const show=p.style.display==='none';p.style.display=show?'':'none';$('toggle-add').textContent=show?'✕ Close':'+ Add';if(show)$('entry').focus();};
   $('view-list').onclick=()=>{currentView='list';switchView();};
   $('view-calendar').onclick=()=>{currentView='calendar';switchView();};
