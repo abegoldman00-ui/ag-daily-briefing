@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="AG Briefing">
   <meta name="theme-color" content="#2563eb">
-  <meta name="app-version" content="2026-09-25.1">
+  <meta name="app-version" content="2026-09-25.2">
   <title>AG Daily Briefing</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="favicon.svg">
@@ -878,6 +878,52 @@
 
   function todayISO(){ return dayjs().format('YYYY-MM-DD'); }
   function parsePeople(s){ return (s||'').split(',').map(x=>x.trim()).filter(Boolean); }
+
+  // People and customers match regardless of capitalization or extra spaces.
+  // Each name has one canonical spelling: prefer normal capitalization ("Acme") over
+  // ALL CAPS over all lowercase, then the most used; all-lowercase names get capitalized.
+  const nameKey=s=>(s||'').trim().replace(/\s+/g,' ').toLowerCase();
+  let canonPeople=new Map(), canonCust=new Map();
+  function titleCase(s){ return s.replace(/\b[a-z]/g,c=>c.toUpperCase()); }
+  const caseRank=s=>(/[A-Z]/.test(s)&&/[a-z]/.test(s))?2:/[A-Z]/.test(s)?1:0;
+  function pickCanonical(counts){
+    const best=[...counts.entries()].sort((a,b)=>(caseRank(b[0])-caseRank(a[0]))||(b[1]-a[1]))[0][0];
+    return caseRank(best)===0?titleCase(best):best;
+  }
+  function buildCanonical(){
+    const pc=new Map(), cc=new Map();
+    const tally=(m,raw)=>{
+      const clean=(raw||'').trim().replace(/\s+/g,' ');
+      if(!clean) return;
+      const k=clean.toLowerCase();
+      if(!m.has(k)) m.set(k,new Map());
+      m.get(k).set(clean,(m.get(k).get(clean)||0)+1);
+    };
+    items.forEach(it=>{ (it.people||[]).forEach(p=>tally(pc,p)); tally(cc,it.customer); });
+    canonPeople=new Map([...pc].map(([k,c])=>[k,pickCanonical(c)]));
+    canonCust=new Map([...cc].map(([k,c])=>[k,pickCanonical(c)]));
+  }
+  function canonName(map,raw){
+    const clean=(raw||'').trim().replace(/\s+/g,' ');
+    if(!clean) return '';
+    return map.get(clean.toLowerCase()) || (clean===clean.toLowerCase()?titleCase(clean):clean);
+  }
+  function canonPeopleList(list){
+    const seen=new Set(), out=[];
+    (list||[]).forEach(p=>{ const c=canonName(canonPeople,p); const k=nameKey(c); if(c&&!seen.has(k)){seen.add(k);out.push(c);} });
+    return out;
+  }
+  function consolidateNames(){
+    buildCanonical();
+    items.forEach(it=>{
+      const people=canonPeopleList(it.people);
+      const customer=canonName(canonCust,it.customer);
+      if(JSON.stringify(people)!==JSON.stringify(it.people||[]) || customer!==(it.customer||'')){
+        it.people=people; it.customer=customer;
+        saveItem(it);
+      }
+    });
+  }
   function isOverdueOrToday(it){ return it.due && !it.done && (it.kind==='todo'||it.kind==='reminder') && dayjs(it.due).isBefore(dayjs(todayISO()).add(1,'day')); }
   function isDueSoon(it){
     if(!it.due || it.done || it.kind==='doc') return false;
@@ -948,6 +994,7 @@
       items.forEach((it,i) => { if(!it.sortOrder) it.sortOrder = i; });
     }
     advanceRecurring();
+    consolidateNames();
     rebuildLinks(); render();
   }
 
@@ -1068,8 +1115,8 @@
     const maxOrder = items.reduce((m,it) => Math.max(m, it.sortOrder||0), 0);
     const canDue=(k==='todo'||k==='reminder'||k==='meeting');
     const it={id,text,kind:k,done:false,ts:Date.now(),
-      people:parsePeople(peopleEl.value).concat(parsed.people),
-      customer:customerEl.value.trim()||parsed.customer,
+      people:canonPeopleList(parsePeople(peopleEl.value).concat(parsed.people)),
+      customer:canonName(canonCust,customerEl.value.trim()||parsed.customer),
       priority:prioEl.value,
       due:canDue?(dueEl.value||parsed.due):'',
       time:canDue?($('itime').value||parsed.time):'',
@@ -1186,8 +1233,8 @@
       it.due=document.getElementById('ed-due').value;
       it.time=document.getElementById('ed-time').value;
       it.repeat=document.getElementById('ed-repeat').checked?'weekly':'';
-      it.people=parsePeople(document.getElementById('ed-people').value);
-      it.customer=document.getElementById('ed-customer').value.trim();
+      it.people=canonPeopleList(parsePeople(document.getElementById('ed-people').value));
+      it.customer=canonName(canonCust,document.getElementById('ed-customer').value);
       it.meta=document.getElementById('ed-meta').value.trim();
       it.body=document.getElementById('ed-body').value.trim();
       editModal.style.display='none';
@@ -1196,13 +1243,14 @@
   }
 
   function rebuildLinks(){
-    const ppl=new Set(),cust=new Set();
-    items.forEach(it=>{(it.people||[]).forEach(p=>ppl.add(p));if(it.customer)cust.add(it.customer);});
-    if(fPerson&&!ppl.has(fPerson))fPerson='';
-    if(fCustomer&&!cust.has(fCustomer))fCustomer='';
-    fPersonEl.innerHTML='<option value="">Person: all</option>'+[...ppl].sort().map(p=>`<option value="${esc(p)}"${p===fPerson?' selected':''}>${esc(p)}</option>`).join('');
-    fCustomerEl.innerHTML='<option value="">Customer: all</option>'+[...cust].sort().map(c=>`<option value="${esc(c)}"${c===fCustomer?' selected':''}>${esc(c)}</option>`).join('');
-    custlist.innerHTML=[...cust].sort().map(c=>`<option value="${esc(c)}">`).join('');
+    buildCanonical();
+    const ppl=new Set(canonPeople.values()),cust=new Set(canonCust.values());
+    if(fPerson) fPerson=canonPeople.get(nameKey(fPerson))||'';
+    if(fCustomer) fCustomer=canonCust.get(nameKey(fCustomer))||'';
+    const byName=(a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'});
+    fPersonEl.innerHTML='<option value="">Person: all</option>'+[...ppl].sort(byName).map(p=>`<option value="${esc(p)}"${p===fPerson?' selected':''}>${esc(p)}</option>`).join('');
+    fCustomerEl.innerHTML='<option value="">Customer: all</option>'+[...cust].sort(byName).map(c=>`<option value="${esc(c)}"${c===fCustomer?' selected':''}>${esc(c)}</option>`).join('');
+    custlist.innerHTML=[...cust].sort(byName).map(c=>`<option value="${esc(c)}">`).join('');
     clearLinksEl.style.display=(fPerson||fCustomer)?'':'none';
   }
 
@@ -1219,8 +1267,8 @@
     else if(filter==='today') shown=shown.filter(x=>x.due===today || isOverdueOrToday(x));
     else if(filter==='meeting') shown=shown.filter(x=>x.kind==='meeting');
     else if(filter==='doc') shown=shown.filter(x=>x.kind==='doc');
-    if(fPerson) shown=shown.filter(x=>(x.people||[]).includes(fPerson));
-    if(fCustomer) shown=shown.filter(x=>x.customer===fCustomer);
+    if(fPerson) shown=shown.filter(x=>(x.people||[]).some(p=>nameKey(p)===nameKey(fPerson)));
+    if(fCustomer) shown=shown.filter(x=>nameKey(x.customer)===nameKey(fCustomer));
     shown=shown.filter(matchSearch);
 
     document.querySelectorAll('.fbtn').forEach(b=>{
@@ -1271,8 +1319,8 @@
 
     // Completed section
     let doneItems = items.filter(x=>x.done);
-    if(fPerson) doneItems=doneItems.filter(x=>(x.people||[]).includes(fPerson));
-    if(fCustomer) doneItems=doneItems.filter(x=>x.customer===fCustomer);
+    if(fPerson) doneItems=doneItems.filter(x=>(x.people||[]).some(p=>nameKey(p)===nameKey(fPerson)));
+    if(fCustomer) doneItems=doneItems.filter(x=>nameKey(x.customer)===nameKey(fCustomer));
     doneItems=doneItems.filter(matchSearch);
 
     if(doneItems.length > 0){
@@ -1557,7 +1605,7 @@
     const dueCount=inWeek.filter(it=>it.kind!=='meeting').length;
     const overdue=open.filter(it=>it.due&&dayjs(it.due).isBefore(nextDay,'day')).length;
     const highPrio=inWeek.filter(it=>it.priority==='high').length;
-    const custs=[...new Set(inWeek.map(it=>it.customer).filter(Boolean))];
+    const custs=[...new Map(inWeek.filter(it=>it.customer).map(it=>[nameKey(it.customer),it.customer])).values()];
     text+='THE WEEK AHEAD\n';
     const parts=[];
     parts.push(meetings+(meetings===1?' meeting':' meetings'));
