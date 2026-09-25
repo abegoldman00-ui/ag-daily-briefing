@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="AG Briefing">
   <meta name="theme-color" content="#2563eb">
-  <meta name="app-version" content="2026-09-25.3">
+  <meta name="app-version" content="2026-09-25.4">
   <title>AG Daily Briefing</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="favicon.svg">
@@ -517,6 +517,8 @@
     .swipe-bg { position: absolute; border-radius: var(--radius); background: #9ca3af; color: #fff; display: flex; align-items: center; padding-left: 18px; box-sizing: border-box; font-weight: 600; font-size: 14px; transition: background-color .15s ease; }
     .swipe-bg.armed { background: #16a34a; }
     .item-row.swiping { z-index: 1; }
+    .autofilled { border-color: var(--text-accent) !important; animation: autofill 1.2s ease; }
+    @keyframes autofill { 0% { background: var(--bg-accent); box-shadow: 0 0 0 3px rgba(37,99,235,.25); } 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); } }
     .menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 190px; display: flex; flex-direction: column; padding: 6px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); animation: fadeIn .15s ease; }
     .menu button { text-align: left; border: none; background: none; border-radius: 8px; padding: 10px 12px; font-size: 14px; color: var(--text-primary); white-space: nowrap; }
     .menu button:hover { background: var(--surface-2); opacity: 1; }
@@ -1139,39 +1141,71 @@
     } else { save(); }
   }
 
-  // Parse natural-language tokens out of the quick-add text:
-  // "tomorrow", "today", weekday names, times like "10am"/"3:30pm",
-  // "@Person" and "#Customer". Only fills fields the user left blank.
+  // Parse natural-language tokens out of the quick-add text (typed or spoken):
+  // times ("10am", "2:30 p.m.", "noon"), dates ("tomorrow", "Friday", "next Tuesday",
+  // "October 5th", "5th of Oct", "10/5", "the 12th", "in 3 days"), "@Person",
+  // "#Customer", existing customers/people by name, and "for <New Customer>".
+  // Only fills fields the user left blank.
   function smartParse(text){
     const out={text, due:'', time:'', people:[], customer:''};
     const today=dayjs(todayISO());
+    const pad=n=>String(n).padStart(2,'0');
     let t=' '+text+' ';
-    t=t.replace(/(\d)\s*([ap])\.\s?m\.?(?=\s)/gi,'$1$2m');
+    t=t.replace(/(\d)\s*([ap])\.?\s?m\.?(?=[\s,])/gi,'$1$2m');
+    const take=(re,fn)=>{ const m=t.match(re); if(!m||fn(m)===false) return false; t=t.replace(m[0],' '); return true; };
+    const setDue=d=>{ if(!d) return false; out.due=d.format('YYYY-MM-DD'); };
 
-    const tm=t.match(/\s(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s/i);
-    if(tm){
-      let h=parseInt(tm[1],10)%12;
-      if(tm[3].toLowerCase()==='pm') h+=12;
-      out.time=String(h).padStart(2,'0')+':'+(tm[2]||'00');
-      t=t.replace(tm[0],' ');
-    }
+    take(/\s(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)(?=[\s,.!?])/i, m=>{
+      let h=parseInt(m[1],10)%12; if(m[3].toLowerCase()==='pm') h+=12;
+      out.time=pad(h)+':'+(m[2]||'00');
+    }) || take(/\s(?:at\s+)?noon(?=[\s,.!?])/i, ()=>{ out.time='12:00'; });
 
-    if(/\stomorrow\s/i.test(t)){ out.due=today.add(1,'day').format('YYYY-MM-DD'); t=t.replace(/\stomorrow\s/i,' '); }
-    else if(/\s(today|tonight)\s/i.test(t)){ out.due=today.format('YYYY-MM-DD'); t=t.replace(/\s(today|tonight)\s/i,' '); }
-    else if(/\snext week\s/i.test(t)){ out.due=today.add(7,'day').format('YYYY-MM-DD'); t=t.replace(/\snext week\s/i,' '); }
-    else {
-      const days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-      for(let i=0;i<7;i++){
-        const re=new RegExp('\\s(on\\s+)?'+days[i]+'\\s','i');
-        if(re.test(t)){
-          let d=today.day(i);
-          if(!d.isAfter(today,'day')) d=d.add(7,'day');
-          out.due=d.format('YYYY-MM-DD');
-          t=t.replace(re,' ');
-          break;
-        }
+    const months=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const monRe='(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?';
+    const prep='(?:(?:on|by|due|for)\\s+)?(?:the\\s+)?';
+    const ord='(\\d{1,2})(?:st|nd|rd|th)?';
+    const end='(?=[\\s,.!?])';
+    const monIdx=m=>months.indexOf(m.slice(0,3).toLowerCase());
+    const onDate=(mo,day,yr)=>{
+      const y=yr?(yr<100?2000+yr:yr):today.year();
+      let d=dayjs(new Date(y,mo,day));
+      if(d.month()!==mo) return null;
+      if(!yr&&d.isBefore(today,'day')) d=d.add(1,'year');
+      return d;
+    };
+    const wdays=['sun','mon','tue','wed','thu','fri','sat'];
+    const small={a:1,an:1,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,ten:10};
+
+    take(new RegExp('\\s'+prep+monRe+'\\s+'+ord+'(?:,?\\s+(\\d{4}))?'+end,'i'), m=>setDue(onDate(monIdx(m[1]),+m[2],m[3]?+m[3]:0)))
+    || take(new RegExp('\\s'+prep+ord+'\\s+of\\s+'+monRe+end,'i'), m=>setDue(onDate(monIdx(m[2]),+m[1])))
+    || take(/\s(?:(?:on|by|due|for)\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?=[\s,.!?])/, m=>setDue(onDate(+m[1]-1,+m[2],m[3]?+m[3]:0)))
+    || take(/\s(?:(?:on|by|due|for)\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)(?=[\s,.!?])/i, m=>{
+      const n=+m[1];
+      for(let k=0;k<3;k++){
+        const base=today.add(k,'month').date(1);
+        if(n<=base.daysInMonth()){ const d=base.date(n); if(!d.isBefore(today,'day')) return setDue(d); }
       }
-    }
+      return false;
+    })
+    || take(/\sin\s+(\d{1,2}|an?|one|two|three|four|five|six|seven|ten)\s+(day|week)s?(?=[\s,.!?])/i, m=>{
+      const n=/^\d+$/.test(m[1])?+m[1]:small[m[1].toLowerCase()];
+      setDue(today.add(n*(m[2].toLowerCase()==='week'?7:1),'day'));
+    })
+    || take(/\s(?:(?:on|by|due|for)\s+)?tomorrow(?=[\s,.!?])/i, ()=>setDue(today.add(1,'day')))
+    || take(/\s(?:(?:on|by|due|for)\s+)?(?:today|tonight|this (?:morning|afternoon|evening))(?=[\s,.!?])/i, ()=>setDue(today))
+    || take(/\s(?:(?:by|for)\s+)?next week(?=[\s,.!?])/i, ()=>setDue(today.add(7,'day')))
+    || take(/\s(?:(?:on|by|due|for|this)\s+)?(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tues?|wed|thur?s?|fri|sat)(?=[\s,.!?])/i, m=>{
+      const idx=wdays.indexOf(m[2].slice(0,3).toLowerCase());
+      let d;
+      if(m[1]){
+        const nextWeekStart=today.subtract((today.day()+6)%7,'day').add(7,'day');
+        d=nextWeekStart.add((idx+6)%7,'day');
+      } else {
+        d=today.day(idx);
+        if(!d.isAfter(today,'day')) d=d.add(7,'day');
+      }
+      setDue(d);
+    });
 
     let m2;
     while((m2=t.match(/\s@([A-Za-z][\w.-]*)/))){ out.people.push(m2[1]); t=t.replace(m2[0],' '); }
@@ -1197,8 +1231,37 @@
       if(m&&/[A-Z]/.test(m[1][0])) out.people.push(name);
     }
 
-    out.text=t.replace(/\s+/g,' ').trim();
+    // A capitalized name after "for" that isn't a known person becomes a new customer.
+    if(!out.customer){
+      take(/\sfor\s+([A-Z][\w&.'-]*(?:\s+(?:and|&|of)\s+[A-Z][\w&.'-]*|\s+[A-Z][\w&.'-]*)*)(?=[\s,.!?])/, m=>{
+        const name=m[1].replace(/[.']+$/,'');
+        if(/^(Me|Him|Her|Them|Us|It|The|A|An|I)$/.test(name)) return false;
+        if(canonPeople.has(nameKey(name))||out.people.some(p=>nameKey(p)===nameKey(name))) return false;
+        out.customer=name;
+      });
+    }
+
+    out.text=t.replace(/\s+([,.;!?])/g,'$1').replace(/\s+/g,' ').replace(/^[\s,;.]+|[\s,;.]+$/g,'').trim();
     return out;
+  }
+
+  // Fill the form fields from the quick-add text as the user types or speaks.
+  // Fields the user filled in themselves are never overwritten.
+  function previewParse(){
+    const parsed=smartParse(entryEl.value);
+    const k=kindEl.value, canDue=(k==='todo'||k==='reminder'||k==='meeting');
+    const fill=(el,val)=>{
+      if(el.value!==''&&el.dataset.auto!=='1') return;
+      if(el.value!==val){
+        el.value=val;
+        if(val){ el.classList.remove('autofilled'); void el.offsetWidth; el.classList.add('autofilled'); }
+      }
+      el.dataset.auto=val?'1':'';
+    };
+    fill(customerEl, parsed.customer ? canonName(canonCust,parsed.customer) : '');
+    fill(peopleEl, canonPeopleList(parsed.people).join(', '));
+    fill(dueEl, canDue?parsed.due:'');
+    fill($('itime'), canDue?parsed.time:'');
   }
 
   function addItem(){
@@ -1220,7 +1283,7 @@
       repeat:repeatEl.checked?'weekly':'',
       sortOrder:maxOrder+1};
     items.push(it);
-    entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';$('itime').value='';prioEl.value='normal';repeatEl.checked=false;
+    entryEl.value='';mtimeEl.value='';docbodyEl.value='';peopleEl.value='';customerEl.value='';dueEl.value='';$('itime').value='';[customerEl,peopleEl,dueEl,$('itime')].forEach(el=>{el.dataset.auto='';el.classList.remove('autofilled');});prioEl.value='normal';repeatEl.checked=false;
     saveItem(it); rebuildLinks(); render();
   }
 
@@ -1999,6 +2062,7 @@
       rec.onresult=e=>{
         const said=[...e.results].map(r=>r[0].transcript).join(' ').trim();
         entryEl.value=(before?before+' ':'')+said.charAt(0).toUpperCase()+said.slice(1);
+        previewParse();
       };
       rec.onend=()=>{ rec=null; mic.classList.remove('listening'); mic.textContent='🎤'; entryEl.focus(); };
       rec.onerror=e=>{ if(e.error==='not-allowed') alert('Microphone access is blocked. Allow it in your browser settings, or use the keyboard\'s dictation mic.'); };
@@ -2010,6 +2074,9 @@
   window.addEventListener('online',()=>{ flushQueue(); });
   setInterval(()=>{ if(readQueue().length) flushQueue(); },30000);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&readQueue().length) flushQueue(); });
+  entryEl.addEventListener('input',previewParse);
+  kindEl.addEventListener('change',previewParse);
+  [customerEl,peopleEl,dueEl,$('itime')].forEach(el=>el.addEventListener('input',()=>{el.dataset.auto='';el.classList.remove('autofilled');}));
   $('toggle-add').onclick=()=>{const p=$('add-panel');const show=p.style.display==='none';p.style.display=show?'':'none';$('toggle-add').textContent=show?'✕ Close':'+ Add';if(show)$('entry').focus();};
   $('view-list').onclick=()=>{currentView='list';switchView();};
   $('view-calendar').onclick=()=>{currentView='calendar';switchView();};
